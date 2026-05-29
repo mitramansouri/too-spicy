@@ -1,8 +1,8 @@
-# Spice Pixels
+# Too Spicy
 
-A small Godot puzzle game prototype where falling spice pixels must be filtered, caught, or allowed to settle into a template shape.
+A small Godot game prototype where falling spice pixels must be caught or allowed to settle into a template shape.
 
-The game combines ideas from falling-block games, color-matching puzzles, and template-based image completion. Spices fall from the top of the screen as colored pixels. The player controls a movable bucket inside a limited control area and decides which spices should pass and which should be blocked.
+Spices fall from the top of the screen as colored pixels. The player controls a movable bucket inside a limited control area and decides which spices should pass and which should be blocked.
 
 ## Game Concept
 
