@@ -6,35 +6,32 @@ const GRID_HEIGHT := 30
 
 const FALL_INTERVAL := 0.15
 const SPAWN_INTERVAL := 0.35
-const SPICES_PER_SPRINKLE := 1
-const MAX_FALLING_SPICES := 20
+const SPICES_PER_SPRINKLE := 3
+const MAX_FALLING_SPICES := 8
 
 const BUCKET_WIDTH := 4
 const BUCKET_HEIGHT := 2
 const BUCKET_MOVE_INTERVAL := 0.08
 
-# Area where the bucket is allowed to move
 const CONTROL_AREA_X := 0
 const CONTROL_AREA_Y := 3
 const CONTROL_AREA_WIDTH := GRID_WIDTH
 const CONTROL_AREA_HEIGHT := 17
 
-var grid_offset := Vector2(100, 40)
+const BOARD_PIXEL_WIDTH := GRID_WIDTH * CELL_SIZE
+const BOARD_PIXEL_HEIGHT := GRID_HEIGHT * CELL_SIZE
+const SIDE_PANEL_WIDTH := 360
+const SIDE_PANEL_GAP := 40
+
+var grid_offset := Vector2.ZERO
+var ui_offset := Vector2.ZERO
 
 var template_min_x := 0
 var template_max_x := GRID_WIDTH - 1
 
-# 0 = empty
-# 1 = outline section
-# 2 = body section
-# 3 = detail section
 var template_grid := []
-
-# null = empty
-# Color = settled spice color
 var settled_grid := []
 
-# null means section is not locked yet
 var section_colors := {
 	1: null,
 	2: null,
@@ -83,12 +80,19 @@ var falling_spices := []
 
 func _ready():
 	randomize()
+	update_layout()
 	create_empty_template()
 	create_empty_settled_grid()
 	create_sample_template()
 	update_template_spawn_bounds()
 	spawn_sprinkle()
 	queue_redraw()
+
+
+func _notification(what):
+	if what == NOTIFICATION_WM_SIZE_CHANGED:
+		update_layout()
+		queue_redraw()
 
 
 func _process(delta):
@@ -107,6 +111,22 @@ func _process(delta):
 	if spawn_timer >= SPAWN_INTERVAL:
 		spawn_timer = 0.0
 		spawn_sprinkle()
+
+
+func update_layout():
+	var viewport_size := get_viewport_rect().size
+
+	var total_width := BOARD_PIXEL_WIDTH + SIDE_PANEL_GAP + SIDE_PANEL_WIDTH
+	var total_height := BOARD_PIXEL_HEIGHT
+
+	var start_x := (viewport_size.x - total_width) / 2.0
+	var start_y := (viewport_size.y - total_height) / 2.0
+
+	grid_offset = Vector2(start_x, start_y)
+	ui_offset = Vector2(
+		grid_offset.x + BOARD_PIXEL_WIDTH + SIDE_PANEL_GAP,
+		grid_offset.y + 40
+	)
 
 
 func handle_bucket_input(delta):
@@ -171,25 +191,20 @@ func create_sample_template():
 	var bottom_y := GRID_HEIGHT - 1
 	var top_y := bottom_y - 7
 
-	# outline: bottom line
 	for x in range(5, 15):
 		template_grid[bottom_y][x] = 1
 
-	# outline: top line
 	for x in range(6, 14):
 		template_grid[top_y][x] = 1
 
-	# outline: left and right sides
 	for y in range(top_y + 1, bottom_y):
 		template_grid[y][5] = 1
 		template_grid[y][14] = 1
 
-	# body area
 	for y in range(top_y + 1, bottom_y):
 		for x in range(6, 14):
 			template_grid[y][x] = 2
 
-	# detail section
 	for x in range(8, 12):
 		template_grid[top_y + 3][x] = 3
 
@@ -343,24 +358,20 @@ func settle_spice(spice):
 	var color: Color = spice["color"]
 	var section_id: int = template_grid[pos.y][pos.x]
 
-	# Outside template
 	if section_id == 0:
 		settled_grid[pos.y][pos.x] = color
 		return
 
-	# First spice in this section locks the section color
 	if section_colors[section_id] == null:
 		section_colors[section_id] = color
 		settled_grid[pos.y][pos.x] = color
 		print("Section ", section_id, " locked to ", spice["name"])
 		return
 
-	# Correct color
 	if colors_match(section_colors[section_id], color):
 		settled_grid[pos.y][pos.x] = color
 		return
 
-	# Wrong color, but it still stays
 	mistakes += 1
 	settled_grid[pos.y][pos.x] = color
 	print("Penalty: wrong spice in section ", section_id, ". Mistakes: ", mistakes)
@@ -515,24 +526,22 @@ func draw_bucket():
 
 
 func draw_ui():
-	var text_pos := Vector2(540, 80)
-
 	draw_string(
 		ThemeDB.fallback_font,
-		text_pos,
+		ui_offset,
 		"Penalties: " + str(mistakes),
 		HORIZONTAL_ALIGNMENT_LEFT,
-		300,
+		SIDE_PANEL_WIDTH,
 		20,
 		Color.WHITE
 	)
 
 	draw_string(
 		ThemeDB.fallback_font,
-		text_pos + Vector2(0, 30),
+		ui_offset + Vector2(0, 30),
 		"Open shakers: " + str(get_available_spawn_columns().size()),
 		HORIZONTAL_ALIGNMENT_LEFT,
-		300,
+		SIDE_PANEL_WIDTH,
 		20,
 		Color.WHITE
 	)
@@ -540,10 +549,10 @@ func draw_ui():
 	if game_ended:
 		draw_string(
 			ThemeDB.fallback_font,
-			text_pos + Vector2(0, 70),
+			ui_offset + Vector2(0, 70),
 			final_message,
 			HORIZONTAL_ALIGNMENT_LEFT,
-			400,
+			SIDE_PANEL_WIDTH,
 			24,
 			Color.YELLOW
 		)
