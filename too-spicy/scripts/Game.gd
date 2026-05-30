@@ -1,11 +1,26 @@
 extends Node2D
 
 const Data = preload("res://scripts/Data.gd")
-
+const GAME_PANEL_SIZE := Vector2(460, 580)
+const GAME_PANEL_PADDING := 24.0
+const PENALTY_TEXT_HEIGHT := 36.0
+const MIN_CELL_SIZE := 16
 const SIDE_PANEL_WIDTH := 360
 const SIDE_PANEL_GAP := 40
+const SHAKER_PIXEL_ROWS: float = 7.0
+const SHAKER_TOP_PADDING: float = 36.0
+const SHAKER_BOTTOM_GAP: float = 8.0
 const BACKGROUND_SETTLED_COLOR := Color(0.35, 0.35, 0.35)
-
+const SHAKER_SOUND_PATH := "res://sounds/shaker.wav"
+const SHAKER_SHAKE_DURATION := 0.22
+const SMART_TARGET_CHANCE := 0.30
+const SHAKER_SOUND_DURATION := 0.16
+const SHAKER_SOUND_RATE := 22050
+const SHAKER_SOUND_COOLDOWN := 0.12
+var shaker_audio_player: AudioStreamPlayer
+var shaker_sound_cooldown_timer := 0.0
+var game_panel_position := Vector2.ZERO
+var template_left_x := 0
 var cell_size := 20
 var grid_width := 20
 var grid_height := 30
@@ -22,7 +37,7 @@ var bucket_move_interval := 0.08
 var control_area_x := 0
 var control_area_y := 3
 var control_area_width := 20
-var control_area_height := 17
+var control_area_height := 10
 
 var board_pixel_width := 0
 var board_pixel_height := 0
@@ -30,8 +45,11 @@ var board_pixel_height := 0
 var grid_offset := Vector2.ZERO
 var ui_offset := Vector2.ZERO
 
-var template_id := Data.TEMPLATE_MUSHROOM
-var template_name := "Mushroom"
+var board_bg_color := Color(0.294, 0.294, 0.294, 1.0)
+var grid_line_color := Color(0.196, 0.196, 0.196, 0.0)
+
+var template_id := Data.TEMPLATE_CUPCAKE
+var template_name := "Cupcake"
 var template_shape := []
 var template_sections := {}
 var template_preview_colors := {}
@@ -59,6 +77,8 @@ var final_message := ""
 var spices := []
 var falling_spices := []
 
+var shaker_shake_timers := {}
+
 
 func _ready():
 	randomize()
@@ -67,12 +87,13 @@ func _ready():
 	create_empty_template()
 	create_empty_settled_grid()
 	create_template_from_shape()
+	fill_floating_background_support_tiles()
 	update_template_spawn_bounds()
 	reset_section_colors()
 	update_control_area()
 	reset_bucket_position()
 	update_layout()
-
+	setup_shaker_sound()
 	spawn_sprinkle()
 	queue_redraw()
 
@@ -89,7 +110,8 @@ func _process(delta):
 
 	handle_bucket_input(delta)
 	catch_spices_touching_bucket()
-
+	update_shaker_timers(delta)
+	update_shaker_sound_cooldown(delta)
 	fall_timer += delta
 	spawn_timer += delta
 
@@ -100,7 +122,6 @@ func _process(delta):
 	if spawn_timer >= spawn_interval:
 		spawn_timer = 0.0
 		spawn_sprinkle()
-
 
 func load_selected_template():
 	if get_tree().has_meta("selected_template_id"):
@@ -114,9 +135,10 @@ func load_selected_template():
 	template_preview_colors = template_data["preview_colors"]
 	template_section_spices = template_data.get("section_spices", {})
 
-	grid_width = int(template_data["grid_width"])
-	grid_height = int(template_data["grid_height"])
-	cell_size = int(template_data["cell_size"])
+	board_bg_color = template_data.get("board_bg_color", board_bg_color)
+	grid_line_color = template_data.get("grid_line_color", grid_line_color)
+
+	set_common_grid_size_from_biggest_template()
 
 	bucket_width = int(template_data["bucket_width"])
 	bucket_height = int(template_data["bucket_height"])
@@ -132,26 +154,56 @@ func load_selected_template():
 	if spices.is_empty():
 		spices = Data.spices
 
-	board_pixel_width = grid_width * cell_size
-	board_pixel_height = grid_height * cell_size
+func set_common_grid_size_from_biggest_template():
+	var max_width: int = 1
+	var max_height: int = 1
 
+	for template_key in Data.templates.keys():
+		var template_data: Dictionary = Data.templates[template_key]
+
+		max_width = max(max_width, int(template_data["grid_width"]))
+		max_height = max(max_height, int(template_data["grid_height"]))
+
+	grid_width = max_width
+	grid_height = max_height
 
 func update_layout():
 	var viewport_size := get_viewport_rect().size
 
+	game_panel_position = Vector2(
+		(viewport_size.x - GAME_PANEL_SIZE.x) / 2.0,
+		(viewport_size.y - GAME_PANEL_SIZE.y) / 2.0
+	)
+
+	var shaker_space: float = SHAKER_TOP_PADDING + SHAKER_BOTTOM_GAP
+
+	var available_board_width: float = GAME_PANEL_SIZE.x - GAME_PANEL_PADDING * 2.0
+	var available_board_height: float = (
+		GAME_PANEL_SIZE.y
+		- GAME_PANEL_PADDING * 2.0
+		- PENALTY_TEXT_HEIGHT
+		- shaker_space
+	)
+
+	var max_cell_from_width: float = floor(available_board_width / float(grid_width))
+	var max_cell_from_height: float = floor(available_board_height / float(grid_height))
+
+	cell_size = max(
+		MIN_CELL_SIZE,
+		int(min(max_cell_from_width, max_cell_from_height))
+	)
+
 	board_pixel_width = grid_width * cell_size
 	board_pixel_height = grid_height * cell_size
 
-	var total_width := board_pixel_width + SIDE_PANEL_GAP + SIDE_PANEL_WIDTH
-	var total_height := board_pixel_height
+	grid_offset = Vector2(
+		game_panel_position.x + (GAME_PANEL_SIZE.x - float(board_pixel_width)) / 2.0,
+		game_panel_position.y + GAME_PANEL_PADDING + PENALTY_TEXT_HEIGHT + shaker_space
+	)
 
-	var start_x := (viewport_size.x - total_width) / 2.0
-	var start_y := (viewport_size.y - total_height) / 2.0
-
-	grid_offset = Vector2(start_x, start_y)
 	ui_offset = Vector2(
-		grid_offset.x + board_pixel_width + SIDE_PANEL_GAP,
-		grid_offset.y + 40
+		game_panel_position.x + GAME_PANEL_PADDING,
+		game_panel_position.y + GAME_PANEL_PADDING + 22.0
 	)
 
 
@@ -195,7 +247,46 @@ func handle_bucket_input(delta):
 
 	bucket_move_timer = 0.0
 	queue_redraw()
+func get_spawn_row_below_shaker() -> int:
+	return 0
 
+func setup_shaker_sound():
+	shaker_audio_player = AudioStreamPlayer.new()
+
+	var shaker_stream: AudioStream = load(SHAKER_SOUND_PATH)
+
+	if shaker_stream == null:
+		push_warning("Could not load shaker sound from: " + SHAKER_SOUND_PATH)
+		return
+
+	shaker_audio_player.stream = shaker_stream
+	shaker_audio_player.volume_db = -8.0
+	add_child(shaker_audio_player)
+
+
+func play_shaker_sound():
+	if shaker_audio_player == null:
+		return
+
+	if shaker_audio_player.stream == null:
+		return
+
+	if shaker_sound_cooldown_timer > 0.0:
+		return
+
+	shaker_audio_player.pitch_scale = randf_range(0.96, 1.04)
+	shaker_audio_player.play()
+
+	shaker_sound_cooldown_timer = SHAKER_SOUND_COOLDOWN
+
+func update_shaker_sound_cooldown(delta):
+	if shaker_sound_cooldown_timer <= 0.0:
+		return
+
+	shaker_sound_cooldown_timer -= delta
+
+	if shaker_sound_cooldown_timer < 0.0:
+		shaker_sound_cooldown_timer = 0.0
 
 func create_empty_template():
 	template_grid.clear()
@@ -222,14 +313,17 @@ func create_empty_settled_grid():
 
 
 func create_template_from_shape():
-	var shape_height := template_shape.size()
+	var shape_height: int = template_shape.size()
+	var shape_width: int = get_template_shape_width()
+
+	template_left_x = int((grid_width - shape_width) / 2)
 	template_top_y = grid_height - shape_height
 
 	for shape_y in range(shape_height):
 		var shape_row: Array = template_shape[shape_y]
 
 		for shape_x in range(shape_row.size()):
-			var grid_x := shape_x
+			var grid_x := template_left_x + shape_x
 			var grid_y := template_top_y + shape_y
 
 			if grid_x < 0 or grid_x >= grid_width:
@@ -240,6 +334,26 @@ func create_template_from_shape():
 
 			template_grid[grid_y][grid_x] = int(shape_row[shape_x])
 
+func get_template_shape_width() -> int:
+	var max_width: int = 0
+
+	for row_value in template_shape:
+		var row: Array = row_value
+		max_width = max(max_width, row.size())
+
+	return max_width
+	
+func fill_floating_background_support_tiles():
+	for x in range(grid_width):
+		var found_template_above := false
+
+		for y in range(grid_height):
+			if template_grid[y][x] != 0:
+				found_template_above = true
+				continue
+
+			if found_template_above:
+				settled_grid[y][x] = BACKGROUND_SETTLED_COLOR
 
 func update_template_spawn_bounds():
 	template_min_x = grid_width - 1
@@ -310,18 +424,166 @@ func spawn_new_spice():
 		check_game_finished()
 		return
 
-	var spawn_x = available_columns.pick_random()
-	var spawn_position := Vector2i(spawn_x, 0)
+	var spawn_x := choose_smart_spawn_column(available_columns)
+	var spawn_position := Vector2i(spawn_x, get_spawn_row_below_shaker())
 
-	var random_spice = spices.pick_random()
+	var selected_spice: Dictionary = choose_smart_spice_for_column(spawn_x)
 
 	var new_spice := {
-		"name": random_spice["name"],
-		"color": random_spice["color"],
+		"id": selected_spice["id"],
+		"name": selected_spice["name"],
+		"color": selected_spice["color"],
 		"grid_pos": spawn_position
 	}
 
 	falling_spices.append(new_spice)
+	start_shaker_shake(spawn_x)
+
+
+func choose_smart_spawn_column(available_columns: Array) -> int:
+	var weighted_columns := []
+	var total_weight := 0.0
+
+	for column_value in available_columns:
+		var column_x := int(column_value)
+		var remaining_in_column := get_remaining_template_cells_in_column(column_x)
+		var target_section := get_next_needed_section_in_column(column_x)
+		var target_spice_id := get_required_spice_id_for_section(target_section)
+
+		var global_need := 0
+		if target_spice_id != "":
+			global_need = get_remaining_template_cells_for_spice(target_spice_id)
+
+		var weight := 1.0 + float(remaining_in_column) + float(global_need) * 0.25
+
+		weighted_columns.append({
+			"x": column_x,
+			"weight": weight
+		})
+
+		total_weight += weight
+
+	var roll := randf() * total_weight
+	var current := 0.0
+
+	for item in weighted_columns:
+		current += float(item["weight"])
+
+		if roll <= current:
+			return int(item["x"])
+
+	return int(available_columns[available_columns.size() - 1])
+
+
+func choose_smart_spice_for_column(column_x: int) -> Dictionary:
+	var target_section := get_next_needed_section_in_column(column_x)
+	var target_spice_id := get_required_spice_id_for_section(target_section)
+
+	if target_spice_id != "" and Data.spice_by_id.has(target_spice_id):
+		if randf() <= SMART_TARGET_CHANCE:
+			return Data.spice_by_id[target_spice_id]
+
+	return choose_weighted_spice_by_remaining_need()
+
+
+func choose_weighted_spice_by_remaining_need() -> Dictionary:
+	if spices.is_empty():
+		return Data.spices[0]
+
+	var weighted_spices := []
+	var total_weight := 0.0
+
+	for spice in spices:
+		var spice_id := str(spice["id"])
+		var need := get_remaining_template_cells_for_spice(spice_id)
+		var weight := 1.0 + float(need)
+
+		weighted_spices.append({
+			"spice": spice,
+			"weight": weight
+		})
+
+		total_weight += weight
+
+	var roll := randf() * total_weight
+	var current := 0.0
+
+	for item in weighted_spices:
+		current += float(item["weight"])
+
+		if roll <= current:
+			return item["spice"]
+
+	return spices.pick_random()
+
+
+func get_remaining_template_cells_in_column(column_x: int) -> int:
+	var count := 0
+
+	for y in range(grid_height):
+		if template_grid[y][column_x] == 0:
+			continue
+
+		if settled_grid[y][column_x] == null:
+			count += 1
+
+	return count
+
+
+func get_next_needed_section_in_column(column_x: int) -> int:
+	for y in range(grid_height - 1, -1, -1):
+		var section_id: int = template_grid[y][column_x]
+
+		if section_id == 0:
+			continue
+
+		if settled_grid[y][column_x] == null:
+			return section_id
+
+	return 0
+
+
+func get_required_spice_id_for_section(section_id: int) -> String:
+	if template_section_spices.has(section_id):
+		return str(template_section_spices[section_id])
+
+	return ""
+
+
+func get_remaining_template_cells_for_spice(spice_id: String) -> int:
+	var count := 0
+
+	for y in range(grid_height):
+		for x in range(grid_width):
+			var section_id: int = template_grid[y][x]
+
+			if section_id == 0:
+				continue
+
+			if settled_grid[y][x] != null:
+				continue
+
+			var required_spice_id := get_required_spice_id_for_section(section_id)
+
+			if required_spice_id == spice_id:
+				count += 1
+
+	count -= get_falling_spice_count_for_spice(spice_id)
+
+	return max(count, 0)
+
+
+func get_falling_spice_count_for_spice(spice_id: String) -> int:
+	var count := 0
+
+	for spice in falling_spices:
+		if not spice.has("id"):
+			continue
+
+		if str(spice["id"]) == spice_id:
+			count += 1
+
+	return count
 
 
 func get_available_spawn_columns() -> Array:
@@ -331,7 +593,7 @@ func get_available_spawn_columns() -> Array:
 		if is_template_column_complete(x):
 			continue
 
-		var spawn_position := Vector2i(x, 0)
+		var spawn_position := Vector2i(x, get_spawn_row_below_shaker())
 
 		if settled_grid[spawn_position.y][spawn_position.x] != null:
 			continue
@@ -532,15 +794,39 @@ func grid_pos_key(grid_position: Vector2i) -> String:
 	return str(grid_position.x) + "," + str(grid_position.y)
 
 
+func start_shaker_shake(column_x: int):
+	shaker_shake_timers[column_x] = SHAKER_SHAKE_DURATION
+	play_shaker_sound()
+	
+func update_shaker_timers(delta):
+	var keys: Array = shaker_shake_timers.keys()
+
+	for key in keys:
+		var new_time: float = float(shaker_shake_timers[key]) - float(delta)
+
+		if new_time <= 0.0:
+			shaker_shake_timers.erase(key)
+		else:
+			shaker_shake_timers[key] = new_time
+
+
+func draw_game_panel():
+	var panel_rect := Rect2(game_panel_position, GAME_PANEL_SIZE)
+
+	draw_rect(panel_rect, Color(0.08, 0.07, 0.05), true)
+	draw_rect(panel_rect, Color(1, 1, 1, 0.12), false)
+	
+	
 func _draw():
+	draw_game_panel()
 	draw_grid()
 	draw_control_area()
+	draw_shakers()
 	draw_template_preview()
 	draw_settled_spices()
 	draw_falling_spices()
 	draw_bucket()
 	draw_ui()
-
 
 func draw_grid():
 	for y in range(grid_height):
@@ -548,8 +834,8 @@ func draw_grid():
 			var draw_position := grid_offset + Vector2(x * cell_size, y * cell_size)
 			var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
-			draw_rect(cell_rect, Color(0.08, 0.08, 0.08), true)
-			draw_rect(cell_rect, Color(0.25, 0.25, 0.25), false)
+			draw_rect(cell_rect, board_bg_color, true)
+			draw_rect(cell_rect, grid_line_color, false)
 
 
 func draw_control_area():
@@ -567,6 +853,70 @@ func draw_control_area():
 
 	draw_rect(area_rect, Color(0.2, 0.6, 1.0, 0.07), true)
 	draw_rect(area_rect, Color(0.2, 0.6, 1.0, 0.6), false)
+
+
+func draw_shakers():
+	for x in range(template_min_x, template_max_x + 1):
+		if is_template_column_complete(x):
+			continue
+
+		draw_salt_shaker_at_column(x)
+
+func draw_salt_shaker_at_column(column_x: int):
+	var shake_time: float = float(shaker_shake_timers.get(column_x, 0.0))
+	var shake_offset: float = 0.0
+
+	if shake_time > 0.0:
+		shake_offset = sin(shake_time * 80.0) * float(cell_size) * 0.10
+
+	var pixel_size: float = max(3.0, float(cell_size) / 7.0)
+	var shaker_width: float = pixel_size * 5.0
+	var shaker_height: float = pixel_size * SHAKER_PIXEL_ROWS
+
+	var start_x: float = grid_offset.x + float(column_x * cell_size) + (float(cell_size) - shaker_width) / 2.0 + shake_offset
+	var start_y: float = grid_offset.y - shaker_height - SHAKER_BOTTOM_GAP
+
+	var origin := Vector2(start_x, start_y)
+
+	var cap_color := Color(0.70, 0.70, 0.70)
+	var body_color := Color(0.92, 0.92, 0.86)
+	var shadow_color := Color(0.62, 0.62, 0.58)
+	var hole_color := Color(0.08, 0.08, 0.08)
+
+	# Upside-down body
+	for gy in range(0, 4):
+		for gx in range(0, 5):
+			draw_shaker_pixel(origin, pixel_size, gx, gy, body_color)
+
+	# Shadow side
+	for gy in range(0, 4):
+		draw_shaker_pixel(origin, pixel_size, 4, gy, shadow_color)
+
+	# Holes near the bottom because the shaker is upside down
+	draw_shaker_pixel(origin, pixel_size, 1, 4, hole_color)
+	draw_shaker_pixel(origin, pixel_size, 2, 4, hole_color)
+	draw_shaker_pixel(origin, pixel_size, 3, 4, hole_color)
+
+	# Bottom cap/lid
+	for gx in range(0, 5):
+		draw_shaker_pixel(origin, pixel_size, gx, 5, cap_color)
+
+	for gx in range(1, 4):
+		draw_shaker_pixel(origin, pixel_size, gx, 6, cap_color)
+
+	var outline_rect := Rect2(origin, Vector2(pixel_size * 5.0, pixel_size * 7.0))
+	draw_rect(outline_rect, Color(0.1, 0.1, 0.1), false)
+
+	# Small visual drop point below the shaker
+	var drop_x: float = grid_offset.x + float(column_x * cell_size) + float(cell_size) / 2.0
+	var drop_y: float = grid_offset.y - 3.0
+	draw_circle(Vector2(drop_x, drop_y), max(1.5, pixel_size * 0.35), Color(1, 1, 1, 0.65))
+	
+func draw_shaker_pixel(origin: Vector2, pixel_size: float, grid_x: int, grid_y: int, color: Color):
+	var pixel_position := origin + Vector2(grid_x * pixel_size, grid_y * pixel_size)
+	var pixel_rect := Rect2(pixel_position, Vector2(pixel_size, pixel_size))
+
+	draw_rect(pixel_rect, color, true)
 
 
 func draw_template_preview():
@@ -591,9 +941,7 @@ func draw_template_preview():
 				template_color.a = 0.25
 				draw_rect(cell_rect, template_color, true)
 
-			draw_rect(cell_rect, Color(1, 1, 1, 0.5), false)
-
-
+			# No inner border here.
 func get_template_preview_color(section_id: int) -> Color:
 	if template_preview_colors.has(section_id):
 		return template_preview_colors[section_id]
@@ -613,8 +961,8 @@ func draw_settled_spices():
 			var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
 			draw_rect(cell_rect, settled_color, true)
-			draw_rect(cell_rect, Color.WHITE, false)
 
+			# No white border here.
 
 func draw_falling_spices():
 	for spice in falling_spices:
@@ -645,68 +993,9 @@ func draw_ui():
 	draw_string(
 		ThemeDB.fallback_font,
 		ui_offset,
-		"Template: " + template_name,
+		"Penalties: " + str(mistakes),
 		HORIZONTAL_ALIGNMENT_LEFT,
-		SIDE_PANEL_WIDTH,
+		int(GAME_PANEL_SIZE.x - GAME_PANEL_PADDING * 2.0),
 		22,
 		Color.WHITE
 	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		ui_offset + Vector2(0, 32),
-		"Penalties: " + str(mistakes),
-		HORIZONTAL_ALIGNMENT_LEFT,
-		SIDE_PANEL_WIDTH,
-		20,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		ui_offset + Vector2(0, 62),
-		"Open shakers: " + str(get_available_spawn_columns().size()),
-		HORIZONTAL_ALIGNMENT_LEFT,
-		SIDE_PANEL_WIDTH,
-		20,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		ui_offset + Vector2(0, 102),
-		"Falling spices:",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		SIDE_PANEL_WIDTH,
-		20,
-		Color.WHITE
-	)
-
-	for i in range(spices.size()):
-		var spice = spices[i]
-		var row_y := 132 + i * 28
-		var spice_rect := Rect2(ui_offset + Vector2(0, row_y - 16), Vector2(18, 18))
-
-		draw_rect(spice_rect, spice["color"], true)
-		draw_rect(spice_rect, Color.WHITE, false)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			ui_offset + Vector2(28, row_y),
-			spice["name"],
-			HORIZONTAL_ALIGNMENT_LEFT,
-			SIDE_PANEL_WIDTH,
-			18,
-			Color.WHITE
-		)
-
-	if game_ended:
-		draw_string(
-			ThemeDB.fallback_font,
-			ui_offset + Vector2(0, 240),
-			final_message,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			SIDE_PANEL_WIDTH,
-			24,
-			Color.YELLOW
-		)

@@ -22,7 +22,7 @@ window/size/viewport_height=1000
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_vim/plugin.cfg")
+enabled=PackedStringArray()
 
 [physics]
 
