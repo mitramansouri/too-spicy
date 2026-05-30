@@ -1,5 +1,7 @@
 extends Node2D
 
+const Data = preload("res://scripts/Data.gd")
+
 const CELL_SIZE := 20
 const GRID_WIDTH := 20
 const GRID_HEIGHT := 30
@@ -48,33 +50,8 @@ var mistakes := 0
 var game_ended := false
 var final_message := ""
 
-var spices := [
-	{
-		"name": "Salt",
-		"color": Color.WHITE
-	},
-	{
-		"name": "Pepper",
-		"color": Color.BLACK
-	},
-	{
-		"name": "Paprika",
-		"color": Color.RED
-	},
-	{
-		"name": "Turmeric",
-		"color": Color.YELLOW
-	},
-	{
-		"name": "Cinnamon",
-		"color": Color(0.45, 0.25, 0.1)
-	},
-	{
-		"name": "Herbs",
-		"color": Color.GREEN
-	}
-]
 
+var spices := Data.spices
 var falling_spices := []
 
 
