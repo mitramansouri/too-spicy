@@ -175,55 +175,49 @@ const templates := {
 TEMPLATE_CANDLE: {
 	"id": TEMPLATE_CANDLE,
 	"name": "Candle",
-	"description": "A soft yellow candle with a bright flame.",
-	"grid_width": 7,
+	"description": "A very easy vertical candle.",
+	"grid_width": 5,
 	"grid_height": 18,
-	"cell_size": 38,
+	"cell_size": 30,
 	"bucket_width": 2,
 	"bucket_height": 1,
-	"spices_per_sprinkle": 1,
-	"max_falling_spices": 2,
+	"spices_per_sprinkle": 3,
+	"max_falling_spices": 10,
 	"fall_interval": 0.5,
 	"spawn_interval": 0.85,
 	"allowed_spices": [
-		SPICE_GARLIC,
-		SPICE_CHILI,
+		SPICE_SALT,
 		SPICE_TURMERIC,
 		SPICE_PEPPER
 	],
 	"sections": {
-		1: "Outer Flame",
-		2: "Inner Flame",
-		3: "Wick",
-		4: "Wax"
+		1: "Wax",
+		2: "Flame",
+		3: "Wick"
 	},
 	"section_spices": {
-		1: SPICE_CHILI,
+		1: SPICE_SALT,
 		2: SPICE_TURMERIC,
-		3: SPICE_PEPPER,
-		4: SPICE_GARLIC
+		3: SPICE_PEPPER
 	},
 	"preview_colors": {
-		1: Color(1.0, 0.45, 0.0),
+		1: Color.WHITE,
 		2: Color.YELLOW,
-		3: Color.BLACK,
-		4: Color(0.96, 0.92, 0.70)
+		3: Color.BLACK
 	},
-	"board_bg_color": Color(0.90, 0.90, 0.90),
-	"grid_line_color": Color(0.78, 0.78, 0.78),
 	"shape": [
-		[0, 0, 0, 1, 0, 0, 0],
-		[0, 0, 1, 1, 1, 0, 0],
-		[0, 1, 1, 2, 1, 1, 0],
-		[0, 1, 1, 1, 1, 1, 0],
-		[0, 4, 4, 3, 4, 4, 0],
-		[0, 4, 4, 4, 4, 4, 0],
-		[0, 4, 4, 4, 4, 4, 0],
-		[0, 4, 4, 4, 4, 4, 0],
-		[0, 4, 4, 4, 4, 4, 0],
-		[0, 4, 4, 4, 4, 4, 0]
+		[0, 0, 2, 0, 0],
+		[0, 2, 2, 2, 0],
+		[0, 1, 3, 1, 0],
+		[0, 1, 1, 1, 1],
+		[0, 1, 1, 1, 1],
+		[1, 1, 1, 1, 1],
+		[1, 1, 1, 1, 1],
+		[1, 1, 1, 1, 1],
+		[1, 1, 1, 1, 1],
+		[1, 1, 1, 1, 1]
 	]
-},
+	},
 
 	TEMPLATE_TURTLE: {
 		"id": TEMPLATE_TURTLE,

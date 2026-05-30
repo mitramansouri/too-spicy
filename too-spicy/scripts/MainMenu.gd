@@ -1,10 +1,16 @@
 extends Control
 
 const Data = preload("res://scripts/Data.gd")
+const FallingSquareScript = preload("res://scripts/FallingSquare.gd")
+const SquigglySeparatorScript = preload("res://scripts/SquigglySeparator.gd")
+
 const ButtonType = Data.ButtonType
 const ButtonName = Data.ButtonName
 
-var dialog = AcceptDialog.new()
+const MENU_SIZE := Vector2(460, 580)
+const SQUARES_PER_CLICK := 8
+
+var dialog := AcceptDialog.new()
 
 const texts = {
 	ButtonType.BLOCKED_ART: "This mode will be added later.\n"
@@ -18,9 +24,6 @@ const texts = {
 	ButtonType.CREDITS: "Game concept and development by the project team.\n"
 		+ "Made with Godot."
 }
-
-const MENU_SIZE := Vector2(460, 580)
-const SQUARES_PER_CLICK := 8
 
 var background: ColorRect
 var menu_panel: PanelContainer
@@ -56,14 +59,14 @@ func _notification(what):
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if title_label.get_global_rect().has_point(event.global_position):
-			_spawn_squares(event.global_position)
+		if title_label != null and title_label.get_global_rect().has_point(event.position):
+			_spawn_squares(event.position)
 
 
 func _spawn_squares(origin: Vector2) -> void:
 	for i in range(SQUARES_PER_CLICK):
 		var square := ColorRect.new()
-		square.set_script(load("res://scripts/FallingSquare.gd"))
+		square.set_script(FallingSquareScript)
 		square.position = origin + Vector2(randf_range(-100.0, 100.0), randf_range(-10.0, 10.0))
 		add_child(square)
 
@@ -122,7 +125,7 @@ func create_menu():
 	root.add_child(easy_mode_button)
 	root.add_child(blocked_art_button)
 
-	var sep = SquigglySeparator.new()
+	var sep = SquigglySeparatorScript.new()
 	sep.color = Color(1, 1, 1, 0.5)
 	sep.dynamic = true
 	sep.period_length_s = 3.0
@@ -132,7 +135,7 @@ func create_menu():
 	root.add_child(options_button)
 	root.add_child(credits_button)
 
-	sep = SquigglySeparator.new()
+	sep = SquigglySeparatorScript.new()
 	sep.color = Color(1, 1, 1, 0.5)
 	sep.dynamic = true
 	sep.period_length_s = 3.0
@@ -165,11 +168,14 @@ func center_menu():
 func create_button(button_type: int) -> Button:
 	var button := Button.new()
 	button.text = ButtonName[button_type]
-	button.custom_minimum_size = Vector2(340, 42)
+	button.custom_minimum_size = Vector2(340, 46)
 	button.add_theme_font_size_override("font_size", 20)
+	button.add_theme_constant_override("h_separation", 12)
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.icon = build_button_icon(button_type)
 
 	if button_type == ButtonType.QUIT:
-		var style = StyleBoxFlat.new()
+		var style := StyleBoxFlat.new()
 		style.border_color = Color.RED
 		style.border_blend = false
 		style.set_corner_radius_all(8)
@@ -178,6 +184,141 @@ func create_button(button_type: int) -> Button:
 		button.add_theme_stylebox_override("hover", style)
 
 	return button
+
+
+func build_button_icon(button_type: int) -> Texture2D:
+	match button_type:
+		ButtonType.EASY_MODE:
+			return create_pixel_icon([
+				"..yyyy..",
+				".y....y.",
+				"y..bb..y",
+				"y......y",
+				"y.bbbb.y",
+				"y..bb..y",
+				".y....y.",
+				"..yyyy.."
+			], {
+				"y": Color(1.0, 0.88, 0.25),
+				"b": Color(0.12, 0.12, 0.12)
+			})
+
+		ButtonType.BLOCKED_ART:
+			return create_pixel_icon([
+				"rrrrrrrr",
+				"r..r..rr",
+				"rrrrrrrr",
+				"rr..r..r",
+				"rrrrrrrr",
+				"r..r..rr",
+				"rrrrrrrr",
+				"........"
+			], {
+				"r": Color(0.75, 0.30, 0.20)
+			})
+
+		ButtonType.HOW_TO_PLAY:
+			return create_pixel_icon([
+				"..wwww..",
+				".wbbbbw.",
+				".wb..bw.",
+				".wb.yy w",
+				".wb..bw.",
+				".wbbbbw.",
+				".w....w.",
+				"..wwww.."
+			], {
+				"w": Color(0.95, 0.95, 0.95),
+				"b": Color(0.25, 0.50, 0.95),
+				"y": Color(1.0, 0.85, 0.20)
+			})
+
+		ButtonType.OPTIONS:
+			return create_pixel_icon([
+				"..gggg..",
+				".gg..gg.",
+				"ggg..ggg",
+				"g..ww..g",
+				"g..ww..g",
+				"ggg..ggg",
+				".gg..gg.",
+				"..gggg.."
+			], {
+				"g": Color(0.70, 0.70, 0.75),
+				"w": Color(0.92, 0.92, 0.95)
+			})
+
+		ButtonType.CREDITS:
+			return create_pixel_icon([
+				"...yy...",
+				"..yyyy..",
+				".yyggy..",
+				"yyyggyyy",
+				".yyggy..",
+				"..yyyy..",
+				"...yy...",
+				"........"
+			], {
+				"y": Color(1.0, 0.88, 0.20),
+				"g": Color(0.95, 0.95, 0.95)
+			})
+
+		ButtonType.QUIT:
+			return create_pixel_icon([
+				".bbbb...",
+				".brrb...",
+				".brrb...",
+				".brrb...",
+				".brrby..",
+				".brrb...",
+				".bbbb...",
+				"........"
+			], {
+				"b": Color(0.55, 0.32, 0.12),
+				"r": Color(0.72, 0.45, 0.20),
+				"y": Color(1.0, 0.85, 0.25)
+			})
+
+	return create_pixel_icon([
+		"........",
+		"..wwww..",
+		".w....w.",
+		".w....w.",
+		".w....w.",
+		".w....w.",
+		"..wwww..",
+		"........"
+	], {
+		"w": Color.WHITE
+	})
+
+
+func create_pixel_icon(pattern: Array, palette: Dictionary, pixel_size: int = 4) -> Texture2D:
+	var rows: int = pattern.size()
+	var cols: int = pattern[0].length()
+
+	var image := Image.create(cols * pixel_size, rows * pixel_size, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+
+	for y in range(rows):
+		var row: String = pattern[y]
+
+		for x in range(cols):
+			var key: String = row.substr(x, 1)
+
+			if key == ".":
+				continue
+
+			if not palette.has(key):
+				continue
+
+			var color: Color = palette[key]
+
+			for py in range(pixel_size):
+				for px in range(pixel_size):
+					image.set_pixel(x * pixel_size + px, y * pixel_size + py, color)
+
+	return ImageTexture.create_from_image(image)
 
 
 func show_welcome_text():
