@@ -143,6 +143,7 @@ const templates := {
 	TEMPLATE_CUPCAKE: {
 		"id": TEMPLATE_CUPCAKE,
 		"name": "Cupcake",
+		"music_path": "res://sounds/bgmusik.mp3",
 		"description": "A small beginner cupcake with frosting and a wrapper.",
 		"grid_width": 7,
 		"grid_height": 18,

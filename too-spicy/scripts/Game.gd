@@ -98,7 +98,6 @@ func _ready():
 	randomize()
 
 	load_selected_template()
-
 	create_empty_template()
 	create_empty_settled_grid()
 	create_empty_support_grid()
@@ -112,6 +111,7 @@ func _ready():
 	update_layout()
 
 	setup_shaker_sound()
+
 	setup_pause_ui()
 	update_pause_ui_layout()
 
@@ -162,7 +162,8 @@ func load_selected_template():
 		template_id = str(get_tree().get_meta("selected_template_id"))
 
 	var template_data: Dictionary = Data.get_template(template_id)
-
+	var template_music_path: String = template_data.get("music_path", "res://sounds/game_music.mp3")
+	MusicManager.play_template_music(template_id, template_music_path)
 	template_name = template_data["name"]
 	template_shape = template_data["shape"]
 	template_sections = template_data["sections"]
@@ -1020,6 +1021,11 @@ func set_game_paused(value: bool):
 
 	if pause_button != null:
 		pause_button.visible = not game_paused
+
+	if game_paused:
+		MusicManager.dim_for_pause()
+	else:
+		MusicManager.restore_after_pause()
 
 
 func _on_pause_pressed():

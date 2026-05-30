@@ -13,7 +13,7 @@ var back_button: Button
 
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-
+	MusicManager.play_menu_music()
 	for child in get_children():
 		child.queue_free()
 
