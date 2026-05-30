@@ -5,15 +5,16 @@ const Data = preload("res://scripts/Data.gd")
 const SIDE_PANEL_WIDTH := 360
 const SIDE_PANEL_GAP := 40
 const BACKGROUND_SETTLED_COLOR := Color(0.35, 0.35, 0.35)
-
+var board_bg_color := Color(0.08, 0.08, 0.08)
+var grid_line_color := Color(0.25, 0.25, 0.25)
 var cell_size := 20
 var grid_width := 20
 var grid_height := 30
 
 var fall_interval := 0.15
 var spawn_interval := 0.35
-var spices_per_sprinkle := 3
-var max_falling_spices := 8
+var spices_per_sprinkle := 5
+var max_falling_spices := 10
 
 var bucket_width := 4
 var bucket_height := 2
@@ -30,8 +31,8 @@ var board_pixel_height := 0
 var grid_offset := Vector2.ZERO
 var ui_offset := Vector2.ZERO
 
-var template_id := Data.TEMPLATE_MUSHROOM
-var template_name := "Mushroom"
+var template_id := Data.TEMPLATE_WHALE
+var template_name := "Whale"
 var template_shape := []
 var template_sections := {}
 var template_preview_colors := {}
@@ -113,7 +114,9 @@ func load_selected_template():
 	template_sections = template_data["sections"]
 	template_preview_colors = template_data["preview_colors"]
 	template_section_spices = template_data.get("section_spices", {})
-
+	
+	board_bg_color = template_data.get("board_bg_color", Color(0.08, 0.08, 0.08))
+	grid_line_color = template_data.get("grid_line_color", Color(0.25, 0.25, 0.25))
 	grid_width = int(template_data["grid_width"])
 	grid_height = int(template_data["grid_height"])
 	cell_size = int(template_data["cell_size"])
@@ -548,9 +551,8 @@ func draw_grid():
 			var draw_position := grid_offset + Vector2(x * cell_size, y * cell_size)
 			var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
-			draw_rect(cell_rect, Color(0.08, 0.08, 0.08), true)
-			draw_rect(cell_rect, Color(0.25, 0.25, 0.25), false)
-
+			draw_rect(cell_rect, board_bg_color, true)
+			draw_rect(cell_rect, grid_line_color, false)
 
 func draw_control_area():
 	var area_position := grid_offset + Vector2(
