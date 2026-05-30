@@ -6,7 +6,10 @@ const GAME_PANEL_SIZE := Vector2(460, 580)
 const GAME_PANEL_PADDING := 24.0
 const PENALTY_TEXT_HEIGHT := 36.0
 const MIN_CELL_SIZE := 16
-
+const SUPPORT_TILE_COLOR := Color(0.26, 0.26, 0.26)
+const SUPPORT_TILE_LINE_COLOR := Color(0.12, 0.12, 0.12, 0.45)
+const EMPTY_TEMPLATE_ALPHA := 0.52
+const EMPTY_TEMPLATE_LIGHTEN_AMOUNT := 0.35
 const SHAKER_PIXEL_ROWS: float = 7.0
 const SHAKER_TOP_PADDING: float = 36.0
 const SHAKER_BOTTOM_GAP: float = 8.0
@@ -64,6 +67,7 @@ var template_max_x := 0
 
 var template_grid := []
 var settled_grid := []
+var support_grid := []
 var section_colors := {}
 
 var fall_timer := 0.0
@@ -94,10 +98,13 @@ func _ready():
 	randomize()
 
 	load_selected_template()
+
 	create_empty_template()
 	create_empty_settled_grid()
+	create_empty_support_grid()
 	create_template_from_shape()
 	fill_floating_background_support_tiles()
+
 	update_template_spawn_bounds()
 	reset_section_colors()
 	update_control_area()
@@ -301,7 +308,17 @@ func create_empty_settled_grid():
 
 		settled_grid.append(row)
 
+func create_empty_support_grid():
+	support_grid.clear()
 
+	for y in range(grid_height):
+		var row := []
+
+		for x in range(grid_width):
+			row.append(false)
+
+		support_grid.append(row)
+		
 func create_template_from_shape():
 	var shape_height: int = template_shape.size()
 	var shape_width: int = get_template_shape_width()
@@ -345,8 +362,8 @@ func fill_floating_background_support_tiles():
 				continue
 
 			if found_template_above:
-				settled_grid[y][x] = BACKGROUND_SETTLED_COLOR
-
+				settled_grid[y][x] = SUPPORT_TILE_COLOR
+				support_grid[y][x] = true
 
 func update_template_spawn_bounds():
 	template_min_x = grid_width - 1
@@ -1130,7 +1147,6 @@ func draw_shaker_pixel(origin: Vector2, pixel_size: float, grid_x: int, grid_y: 
 
 	draw_rect(pixel_rect, color, true)
 
-
 func draw_template_preview():
 	for y in range(grid_height):
 		for x in range(grid_width):
@@ -1142,24 +1158,28 @@ func draw_template_preview():
 			var draw_position := grid_offset + Vector2(x * cell_size, y * cell_size)
 			var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
-			var locked_color = section_colors[section_id]
-
-			if locked_color != null:
-				var preview_color: Color = locked_color
-				preview_color.a = 0.35
-				draw_rect(cell_rect, preview_color, true)
-			else:
-				var template_color := get_template_preview_color(section_id)
-				template_color.a = 0.25
-				draw_rect(cell_rect, template_color, true)
+			var preview_color := get_empty_template_display_color(section_id)
+			draw_rect(cell_rect, preview_color, true)
 
 
+
+func get_empty_template_display_color(section_id: int) -> Color:
+	var base_color := get_template_preview_color(section_id)
+
+	if section_colors.has(section_id) and section_colors[section_id] != null:
+		base_color = section_colors[section_id]
+
+	var lighter_color := base_color.lerp(Color.WHITE, EMPTY_TEMPLATE_LIGHTEN_AMOUNT)
+	lighter_color.a = EMPTY_TEMPLATE_ALPHA
+
+	return lighter_color
+	
+	
 func get_template_preview_color(section_id: int) -> Color:
 	if template_preview_colors.has(section_id):
 		return template_preview_colors[section_id]
 
 	return Color(1, 1, 1)
-
 
 func draw_settled_spices():
 	for y in range(grid_height):
@@ -1172,9 +1192,45 @@ func draw_settled_spices():
 			var draw_position := grid_offset + Vector2(x * cell_size, y * cell_size)
 			var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
-			draw_rect(cell_rect, settled_color, true)
+			if support_grid.size() > y and support_grid[y].size() > x and support_grid[y][x]:
+				draw_support_tile(cell_rect)
+			else:
+				draw_rect(cell_rect, settled_color, true)
 
 
+
+
+func draw_support_tile(cell_rect: Rect2):
+	draw_rect(cell_rect, SUPPORT_TILE_COLOR, true)
+
+	var p: Vector2 = cell_rect.position
+	var s: float = float(cell_size)
+	var m: float = 3.0
+
+	# All line endpoints stay inside this one tile.
+	# This prevents the support texture from interfering with real template tiles.
+
+	draw_line(
+		p + Vector2(m, s - m),
+		p + Vector2(s - m, m),
+		SUPPORT_TILE_LINE_COLOR,
+		1.0
+	)
+
+	draw_line(
+		p + Vector2(m, s * 0.60),
+		p + Vector2(s * 0.60, m),
+		SUPPORT_TILE_LINE_COLOR,
+		1.0
+	)
+
+	draw_line(
+		p + Vector2(s * 0.40, s - m),
+		p + Vector2(s - m, s * 0.40),
+		SUPPORT_TILE_LINE_COLOR,
+		1.0
+	)
+	
 func draw_falling_spices():
 	for spice in falling_spices:
 		var spice_position: Vector2i = spice["grid_pos"]
