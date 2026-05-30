@@ -112,6 +112,11 @@ const templates := {
 			2: "Spots",
 			3: "Stem"
 		},
+		"section_spices": {
+			1: SPICE_PAPRIKA,
+			2: SPICE_SALT,
+			3: SPICE_CINNAMON
+		},
 		"preview_colors": {
 			1: Color.RED,
 			2: Color.WHITE,

@@ -4,15 +4,16 @@ const Data = preload("res://scripts/Data.gd")
 
 const SIDE_PANEL_WIDTH := 360
 const SIDE_PANEL_GAP := 40
+const BACKGROUND_SETTLED_COLOR := Color(0.35, 0.35, 0.35)
 
 var cell_size := 20
 var grid_width := 20
 var grid_height := 30
-const BACKGROUND_SETTLED_COLOR := Color(0.35, 0.35, 0.35)
-var fall_interval := 0.01
-var spawn_interval := 0.9
+
+var fall_interval := 0.15
+var spawn_interval := 0.35
 var spices_per_sprinkle := 3
-var max_falling_spices := 10
+var max_falling_spices := 8
 
 var bucket_width := 4
 var bucket_height := 2
@@ -34,6 +35,7 @@ var template_name := "Mushroom"
 var template_shape := []
 var template_sections := {}
 var template_preview_colors := {}
+var template_section_spices := {}
 
 var template_top_y := 0
 var template_min_x := 0
@@ -87,6 +89,7 @@ func _process(delta):
 
 	handle_bucket_input(delta)
 	catch_spices_touching_bucket()
+
 	fall_timer += delta
 	spawn_timer += delta
 
@@ -109,6 +112,7 @@ func load_selected_template():
 	template_shape = template_data["shape"]
 	template_sections = template_data["sections"]
 	template_preview_colors = template_data["preview_colors"]
+	template_section_spices = template_data.get("section_spices", {})
 
 	grid_width = int(template_data["grid_width"])
 	grid_height = int(template_data["grid_height"])
@@ -149,6 +153,7 @@ func update_layout():
 		grid_offset.x + board_pixel_width + SIDE_PANEL_GAP,
 		grid_offset.y + 40
 	)
+
 
 func handle_bucket_input(delta):
 	bucket_move_timer += delta
@@ -221,9 +226,9 @@ func create_template_from_shape():
 	template_top_y = grid_height - shape_height
 
 	for shape_y in range(shape_height):
-		var row: Array = template_shape[shape_y]
+		var shape_row: Array = template_shape[shape_y]
 
-		for shape_x in range(row.size()):
+		for shape_x in range(shape_row.size()):
 			var grid_x := shape_x
 			var grid_y := template_top_y + shape_y
 
@@ -233,7 +238,7 @@ func create_template_from_shape():
 			if grid_y < 0 or grid_y >= grid_height:
 				continue
 
-			template_grid[grid_y][grid_x] = int(row[shape_x])
+			template_grid[grid_y][grid_x] = int(shape_row[shape_x])
 
 
 func update_template_spawn_bounds():
@@ -257,7 +262,14 @@ func reset_section_colors():
 			if section_id == 0:
 				continue
 
-			if not section_colors.has(section_id):
+			if section_colors.has(section_id):
+				continue
+
+			if template_section_spices.has(section_id):
+				var spice_id: String = template_section_spices[section_id]
+				var spice_data: Dictionary = Data.spice_by_id[spice_id]
+				section_colors[section_id] = spice_data["color"]
+			else:
 				section_colors[section_id] = null
 
 
@@ -298,15 +310,15 @@ func spawn_new_spice():
 		check_game_finished()
 		return
 
-	var x = available_columns.pick_random()
-	var spawn_pos := Vector2i(x, 0)
+	var spawn_x = available_columns.pick_random()
+	var spawn_position := Vector2i(spawn_x, 0)
 
 	var random_spice = spices.pick_random()
 
 	var new_spice := {
 		"name": random_spice["name"],
 		"color": random_spice["color"],
-		"grid_pos": spawn_pos
+		"grid_pos": spawn_position
 	}
 
 	falling_spices.append(new_spice)
@@ -319,12 +331,12 @@ func get_available_spawn_columns() -> Array:
 		if is_template_column_complete(x):
 			continue
 
-		var spawn_pos := Vector2i(x, 0)
+		var spawn_position := Vector2i(x, 0)
 
-		if settled_grid[spawn_pos.y][spawn_pos.x] != null:
+		if settled_grid[spawn_position.y][spawn_position.x] != null:
 			continue
 
-		if is_position_taken_by_falling(spawn_pos):
+		if is_position_taken_by_falling(spawn_position):
 			continue
 
 		columns.append(x)
@@ -350,12 +362,12 @@ func is_template_column_complete(x: int) -> bool:
 func remove_spices_from_completed_columns():
 	for i in range(falling_spices.size() - 1, -1, -1):
 		var spice = falling_spices[i]
-		var pos: Vector2i = spice["grid_pos"]
+		var spice_position: Vector2i = spice["grid_pos"]
 
-		if pos.x < template_min_x or pos.x > template_max_x:
+		if spice_position.x < template_min_x or spice_position.x > template_max_x:
 			continue
 
-		if is_template_column_complete(pos.x):
+		if is_template_column_complete(spice_position.x):
 			falling_spices.remove_at(i)
 
 
@@ -368,16 +380,16 @@ func move_falling_spices_down():
 	var reserved_positions := {}
 
 	for spice in falling_spices:
-		var current_pos: Vector2i = spice["grid_pos"]
-		var next_pos := current_pos + Vector2i(0, 1)
-		var next_key := grid_pos_key(next_pos)
+		var current_position: Vector2i = spice["grid_pos"]
+		var next_position := current_position + Vector2i(0, 1)
+		var next_key := grid_pos_key(next_position)
 
-		if is_bucket_blocking(current_pos) or is_bucket_blocking(next_pos):
+		if is_bucket_blocking(current_position) or is_bucket_blocking(next_position):
 			spices_to_remove.append(spice)
 			continue
 
-		if can_move_to(next_pos) and not reserved_positions.has(next_key):
-			spice["grid_pos"] = next_pos
+		if can_move_to(next_position) and not reserved_positions.has(next_key):
+			spice["grid_pos"] = next_position
 			reserved_positions[next_key] = true
 		else:
 			settle_spice(spice)
@@ -391,20 +403,28 @@ func move_falling_spices_down():
 	queue_redraw()
 
 
-func is_bucket_blocking(grid_pos: Vector2i) -> bool:
-	var inside_x := grid_pos.x >= bucket_pos.x and grid_pos.x < bucket_pos.x + bucket_width
-	var inside_y := grid_pos.y >= bucket_pos.y and grid_pos.y < bucket_pos.y + bucket_height
+func is_bucket_blocking(grid_position: Vector2i) -> bool:
+	var inside_x := grid_position.x >= bucket_pos.x and grid_position.x < bucket_pos.x + bucket_width
+	var inside_y := grid_position.y >= bucket_pos.y and grid_position.y < bucket_pos.y + bucket_height
 
 	return inside_x and inside_y
+
+
+func is_inside_bucket_at_position(grid_position: Vector2i, test_bucket_pos: Vector2i) -> bool:
+	var inside_x := grid_position.x >= test_bucket_pos.x and grid_position.x < test_bucket_pos.x + bucket_width
+	var inside_y := grid_position.y >= test_bucket_pos.y and grid_position.y < test_bucket_pos.y + bucket_height
+
+	return inside_x and inside_y
+
 
 func catch_spices_touching_bucket():
 	var removed_any := false
 
 	for i in range(falling_spices.size() - 1, -1, -1):
 		var spice = falling_spices[i]
-		var pos: Vector2i = spice["grid_pos"]
+		var spice_position: Vector2i = spice["grid_pos"]
 
-		if is_bucket_blocking(pos):
+		if is_bucket_blocking(spice_position):
 			falling_spices.remove_at(i)
 			removed_any = true
 
@@ -412,19 +432,19 @@ func catch_spices_touching_bucket():
 		queue_redraw()
 
 
-func catch_spices_in_bucket_sweep(old_pos: Vector2i, new_pos: Vector2i):
+func catch_spices_in_bucket_sweep(old_bucket_pos: Vector2i, new_bucket_pos: Vector2i):
 	var removed_any := false
 
 	for i in range(falling_spices.size() - 1, -1, -1):
 		var spice = falling_spices[i]
-		var spice_pos: Vector2i = spice["grid_pos"]
+		var spice_position: Vector2i = spice["grid_pos"]
 
-		if is_inside_bucket_at_position(spice_pos, old_pos):
+		if is_inside_bucket_at_position(spice_position, old_bucket_pos):
 			falling_spices.remove_at(i)
 			removed_any = true
 			continue
 
-		if is_inside_bucket_at_position(spice_pos, new_pos):
+		if is_inside_bucket_at_position(spice_position, new_bucket_pos):
 			falling_spices.remove_at(i)
 			removed_any = true
 			continue
@@ -433,51 +453,45 @@ func catch_spices_in_bucket_sweep(old_pos: Vector2i, new_pos: Vector2i):
 		queue_redraw()
 
 
-func is_inside_bucket_at_position(grid_pos: Vector2i, test_bucket_pos: Vector2i) -> bool:
-	var inside_x := grid_pos.x >= test_bucket_pos.x and grid_pos.x < test_bucket_pos.x + bucket_width
-	var inside_y := grid_pos.y >= test_bucket_pos.y and grid_pos.y < test_bucket_pos.y + bucket_height
-
-	return inside_x and inside_y
-
-func can_move_to(grid_pos: Vector2i) -> bool:
-	if grid_pos.x < 0 or grid_pos.x >= grid_width:
+func can_move_to(grid_position: Vector2i) -> bool:
+	if grid_position.x < 0 or grid_position.x >= grid_width:
 		return false
 
-	if grid_pos.y < 0 or grid_pos.y >= grid_height:
+	if grid_position.y < 0 or grid_position.y >= grid_height:
 		return false
 
-	if settled_grid[grid_pos.y][grid_pos.x] != null:
+	if settled_grid[grid_position.y][grid_position.x] != null:
 		return false
 
 	return true
 
-func settle_spice(spice):
-	var pos: Vector2i = spice["grid_pos"]
-	var color: Color = spice["color"]
-	var section_id: int = template_grid[pos.y][pos.x]
 
-	# Outside template
-	# It still stays as a block, but becomes gray because it is background/filler.
+func settle_spice(spice):
+	var spice_position: Vector2i = spice["grid_pos"]
+	var spice_color: Color = spice["color"]
+	var section_id: int = template_grid[spice_position.y][spice_position.x]
+
 	if section_id == 0:
-		settled_grid[pos.y][pos.x] = BACKGROUND_SETTLED_COLOR
+		settled_grid[spice_position.y][spice_position.x] = BACKGROUND_SETTLED_COLOR
 		return
 
 	if not section_colors.has(section_id):
 		section_colors[section_id] = null
 
 	if section_colors[section_id] == null:
-		section_colors[section_id] = color
-		settled_grid[pos.y][pos.x] = color
+		section_colors[section_id] = spice_color
+		settled_grid[spice_position.y][spice_position.x] = spice_color
 		print("Section ", section_id, " locked to ", spice["name"])
 		return
 
-	if colors_match(section_colors[section_id], color):
-		settled_grid[pos.y][pos.x] = color
+	if colors_match(section_colors[section_id], spice_color):
+		settled_grid[spice_position.y][spice_position.x] = spice_color
 		return
 
 	mistakes += 1
-	settled_grid[pos.y][pos.x] = color
+	settled_grid[spice_position.y][spice_position.x] = spice_color
 	print("Penalty: wrong spice in section ", section_id, ". Mistakes: ", mistakes)
+
 
 func check_game_finished():
 	if not are_all_template_tiles_filled():
@@ -506,16 +520,16 @@ func colors_match(a: Color, b: Color) -> bool:
 	return a == b
 
 
-func is_position_taken_by_falling(grid_pos: Vector2i) -> bool:
+func is_position_taken_by_falling(grid_position: Vector2i) -> bool:
 	for spice in falling_spices:
-		if spice["grid_pos"] == grid_pos:
+		if spice["grid_pos"] == grid_position:
 			return true
 
 	return false
 
 
-func grid_pos_key(grid_pos: Vector2i) -> String:
-	return str(grid_pos.x) + "," + str(grid_pos.y)
+func grid_pos_key(grid_position: Vector2i) -> String:
+	return str(grid_position.x) + "," + str(grid_position.y)
 
 
 func _draw():
@@ -531,28 +545,28 @@ func _draw():
 func draw_grid():
 	for y in range(grid_height):
 		for x in range(grid_width):
-			var pos := grid_offset + Vector2(x * cell_size, y * cell_size)
-			var rect := Rect2(pos, Vector2(cell_size, cell_size))
+			var draw_position := grid_offset + Vector2(x * cell_size, y * cell_size)
+			var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
-			draw_rect(rect, Color(0.08, 0.08, 0.08), true)
-			draw_rect(rect, Color(0.25, 0.25, 0.25), false)
+			draw_rect(cell_rect, Color(0.08, 0.08, 0.08), true)
+			draw_rect(cell_rect, Color(0.25, 0.25, 0.25), false)
 
 
 func draw_control_area():
-	var pos := grid_offset + Vector2(
+	var area_position := grid_offset + Vector2(
 		control_area_x * cell_size,
 		control_area_y * cell_size
 	)
 
-	var size := Vector2(
+	var area_size := Vector2(
 		control_area_width * cell_size,
 		control_area_height * cell_size
 	)
 
-	var rect := Rect2(pos, size)
+	var area_rect := Rect2(area_position, area_size)
 
-	draw_rect(rect, Color(0.2, 0.6, 1.0, 0.07), true)
-	draw_rect(rect, Color(0.2, 0.6, 1.0, 0.6), false)
+	draw_rect(area_rect, Color(0.2, 0.6, 1.0, 0.07), true)
+	draw_rect(area_rect, Color(0.2, 0.6, 1.0, 0.6), false)
 
 
 func draw_template_preview():
@@ -563,21 +577,21 @@ func draw_template_preview():
 			if section_id == 0:
 				continue
 
-			var pos := grid_offset + Vector2(x * cell_size, y * cell_size)
-			var rect := Rect2(pos, Vector2(cell_size, cell_size))
+			var draw_position := grid_offset + Vector2(x * cell_size, y * cell_size)
+			var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
 			var locked_color = section_colors[section_id]
 
 			if locked_color != null:
 				var preview_color: Color = locked_color
 				preview_color.a = 0.35
-				draw_rect(rect, preview_color, true)
+				draw_rect(cell_rect, preview_color, true)
 			else:
-				var color := get_template_preview_color(section_id)
-				color.a = 0.25
-				draw_rect(rect, color, true)
+				var template_color := get_template_preview_color(section_id)
+				template_color.a = 0.25
+				draw_rect(cell_rect, template_color, true)
 
-			draw_rect(rect, Color(1, 1, 1, 0.5), false)
+			draw_rect(cell_rect, Color(1, 1, 1, 0.5), false)
 
 
 func get_template_preview_color(section_id: int) -> Color:
@@ -590,41 +604,41 @@ func get_template_preview_color(section_id: int) -> Color:
 func draw_settled_spices():
 	for y in range(grid_height):
 		for x in range(grid_width):
-			var color = settled_grid[y][x]
+			var settled_color = settled_grid[y][x]
 
-			if color == null:
+			if settled_color == null:
 				continue
 
-			var pos := grid_offset + Vector2(x * cell_size, y * cell_size)
-			var rect := Rect2(pos, Vector2(cell_size, cell_size))
+			var draw_position := grid_offset + Vector2(x * cell_size, y * cell_size)
+			var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
-			draw_rect(rect, color, true)
-			draw_rect(rect, Color.WHITE, false)
+			draw_rect(cell_rect, settled_color, true)
+			draw_rect(cell_rect, Color.WHITE, false)
 
 
 func draw_falling_spices():
 	for spice in falling_spices:
-		var grid_pos: Vector2i = spice["grid_pos"]
-		var color: Color = spice["color"]
+		var spice_position: Vector2i = spice["grid_pos"]
+		var spice_color: Color = spice["color"]
 
-		var pos := grid_offset + Vector2(grid_pos.x * cell_size, grid_pos.y * cell_size)
-		var rect := Rect2(pos, Vector2(cell_size, cell_size))
+		var draw_position := grid_offset + Vector2(spice_position.x * cell_size, spice_position.y * cell_size)
+		var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
-		draw_rect(rect, color, true)
-		draw_rect(rect, Color.WHITE, false)
+		draw_rect(cell_rect, spice_color, true)
+		draw_rect(cell_rect, Color.WHITE, false)
 
 
 func draw_bucket():
 	for y in range(bucket_height):
 		for x in range(bucket_width):
-			var grid_x := bucket_pos.x + x
-			var grid_y := bucket_pos.y + y
+			var bucket_grid_x := bucket_pos.x + x
+			var bucket_grid_y := bucket_pos.y + y
 
-			var pos := grid_offset + Vector2(grid_x * cell_size, grid_y * cell_size)
-			var rect := Rect2(pos, Vector2(cell_size, cell_size))
+			var draw_position := grid_offset + Vector2(bucket_grid_x * cell_size, bucket_grid_y * cell_size)
+			var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
-			draw_rect(rect, Color(0.2, 0.6, 1.0), true)
-			draw_rect(rect, Color.WHITE, false)
+			draw_rect(cell_rect, Color(0.2, 0.6, 1.0), true)
+			draw_rect(cell_rect, Color.WHITE, false)
 
 
 func draw_ui():
@@ -670,15 +684,15 @@ func draw_ui():
 
 	for i in range(spices.size()):
 		var spice = spices[i]
-		var y := 132 + i * 28
-		var color_rect := Rect2(ui_offset + Vector2(0, y - 16), Vector2(18, 18))
+		var row_y := 132 + i * 28
+		var spice_rect := Rect2(ui_offset + Vector2(0, row_y - 16), Vector2(18, 18))
 
-		draw_rect(color_rect, spice["color"], true)
-		draw_rect(color_rect, Color.WHITE, false)
+		draw_rect(spice_rect, spice["color"], true)
+		draw_rect(spice_rect, Color.WHITE, false)
 
 		draw_string(
 			ThemeDB.fallback_font,
-			ui_offset + Vector2(28, y),
+			ui_offset + Vector2(28, row_y),
 			spice["name"],
 			HORIZONTAL_ALIGNMENT_LEFT,
 			SIDE_PANEL_WIDTH,
