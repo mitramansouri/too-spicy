@@ -8,10 +8,14 @@ const SHAKER_PIXEL_ROWS: float = 7.0
 const SHAKER_TOP_PADDING: float = 36.0
 const SHAKER_BOTTOM_GAP: float = 8.0
 const BACKGROUND_SETTLED_COLOR := Color(0.35, 0.35, 0.35)
-
+const SHAKER_SOUND_PATH := "res://sounds/shaker.wav"
 const SHAKER_SHAKE_DURATION := 0.22
 const SMART_TARGET_CHANCE := 0.30
-
+const SHAKER_SOUND_DURATION := 0.16
+const SHAKER_SOUND_RATE := 22050
+const SHAKER_SOUND_COOLDOWN := 0.12
+var shaker_audio_player: AudioStreamPlayer
+var shaker_sound_cooldown_timer := 0.0
 var cell_size := 20
 var grid_width := 20
 var grid_height := 30
@@ -84,7 +88,7 @@ func _ready():
 	update_control_area()
 	reset_bucket_position()
 	update_layout()
-
+	setup_shaker_sound()
 	spawn_sprinkle()
 	queue_redraw()
 
@@ -102,7 +106,7 @@ func _process(delta):
 	handle_bucket_input(delta)
 	catch_spices_touching_bucket()
 	update_shaker_timers(delta)
-
+	update_shaker_sound_cooldown(delta)
 	fall_timer += delta
 	spawn_timer += delta
 
@@ -213,6 +217,44 @@ func handle_bucket_input(delta):
 	queue_redraw()
 func get_spawn_row_below_shaker() -> int:
 	return 0
+
+func setup_shaker_sound():
+	shaker_audio_player = AudioStreamPlayer.new()
+
+	var shaker_stream: AudioStream = load(SHAKER_SOUND_PATH)
+
+	if shaker_stream == null:
+		push_warning("Could not load shaker sound from: " + SHAKER_SOUND_PATH)
+		return
+
+	shaker_audio_player.stream = shaker_stream
+	shaker_audio_player.volume_db = -8.0
+	add_child(shaker_audio_player)
+
+
+func play_shaker_sound():
+	if shaker_audio_player == null:
+		return
+
+	if shaker_audio_player.stream == null:
+		return
+
+	if shaker_sound_cooldown_timer > 0.0:
+		return
+
+	shaker_audio_player.pitch_scale = randf_range(0.96, 1.04)
+	shaker_audio_player.play()
+
+	shaker_sound_cooldown_timer = SHAKER_SOUND_COOLDOWN
+
+func update_shaker_sound_cooldown(delta):
+	if shaker_sound_cooldown_timer <= 0.0:
+		return
+
+	shaker_sound_cooldown_timer -= delta
+
+	if shaker_sound_cooldown_timer < 0.0:
+		shaker_sound_cooldown_timer = 0.0
 
 func create_empty_template():
 	template_grid.clear()
@@ -710,7 +752,8 @@ func grid_pos_key(grid_position: Vector2i) -> String:
 
 func start_shaker_shake(column_x: int):
 	shaker_shake_timers[column_x] = SHAKER_SHAKE_DURATION
-
+	play_shaker_sound()
+	
 func update_shaker_timers(delta):
 	var keys: Array = shaker_shake_timers.keys()
 

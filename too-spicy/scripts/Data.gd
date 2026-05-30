@@ -143,7 +143,7 @@ const templates := {
 		"id": TEMPLATE_CUPCAKE,
 		"name": "Cupcake",
 		"description": "A small beginner cupcake with frosting and a wrapper.",
-		"grid_width": 7,
+		"grid_width": 9,
 		"grid_height": 18,
 		"cell_size": 34,
 		"bucket_width": 2,
@@ -177,9 +177,9 @@ const templates := {
 	[0, 1, 1, 2, 1, 1, 0],
 	[1, 1, 1, 1, 1, 1, 1],
 	[1, 1, 1, 1, 1, 1, 1],
-	[3, 3, 3, 3, 3, 3, 3],
-	[3, 3, 3, 3, 3, 3, 3],
-	[3, 3, 3, 3, 3, 3, 3]
+	[0, 3, 3, 3, 3, 3, 0],
+	[0, 3, 3, 3, 3, 3, 0],
+	[0, 3, 3, 3, 3, 3, 0]
 ]
 	},
 
