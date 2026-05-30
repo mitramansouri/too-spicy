@@ -1,26 +1,27 @@
 extends Node2D
 
 const Data = preload("res://scripts/Data.gd")
+
 const GAME_PANEL_SIZE := Vector2(460, 580)
 const GAME_PANEL_PADDING := 24.0
 const PENALTY_TEXT_HEIGHT := 36.0
 const MIN_CELL_SIZE := 16
-const SIDE_PANEL_WIDTH := 360
-const SIDE_PANEL_GAP := 40
+
 const SHAKER_PIXEL_ROWS: float = 7.0
 const SHAKER_TOP_PADDING: float = 36.0
 const SHAKER_BOTTOM_GAP: float = 8.0
-const BACKGROUND_SETTLED_COLOR := Color(0.35, 0.35, 0.35)
-const SHAKER_SOUND_PATH := "res://sounds/shaker.wav"
 const SHAKER_SHAKE_DURATION := 0.22
 const SMART_TARGET_CHANCE := 0.30
-const SHAKER_SOUND_DURATION := 0.16
-const SHAKER_SOUND_RATE := 22050
+
+const SHAKER_SOUND_PATH := "res://sounds/shaker.wav"
 const SHAKER_SOUND_COOLDOWN := 0.12
-var shaker_audio_player: AudioStreamPlayer
-var shaker_sound_cooldown_timer := 0.0
-var game_panel_position := Vector2.ZERO
-var template_left_x := 0
+
+const BACKGROUND_SETTLED_COLOR := Color(0.35, 0.35, 0.35)
+
+const PAUSE_BUTTON_SIZE := Vector2(120, 36)
+const PAUSE_MENU_SIZE := Vector2(320, 285)
+
+
 var cell_size := 20
 var grid_width := 20
 var grid_height := 30
@@ -37,11 +38,12 @@ var bucket_move_interval := 0.08
 var control_area_x := 0
 var control_area_y := 3
 var control_area_width := 20
-var control_area_height := 10
+var control_area_height := 17
 
 var board_pixel_width := 0
 var board_pixel_height := 0
 
+var game_panel_position := Vector2.ZERO
 var grid_offset := Vector2.ZERO
 var ui_offset := Vector2.ZERO
 
@@ -56,12 +58,12 @@ var template_preview_colors := {}
 var template_section_spices := {}
 
 var template_top_y := 0
+var template_left_x := 0
 var template_min_x := 0
 var template_max_x := 0
 
 var template_grid := []
 var settled_grid := []
-
 var section_colors := {}
 
 var fall_timer := 0.0
@@ -76,8 +78,16 @@ var final_message := ""
 
 var spices := []
 var falling_spices := []
-
 var shaker_shake_timers := {}
+
+var shaker_audio_player: AudioStreamPlayer
+var shaker_sound_cooldown_timer := 0.0
+
+var game_paused := false
+var pause_button: Button
+var pause_overlay: ColorRect
+var pause_panel: PanelContainer
+var pause_options_dialog: AcceptDialog
 
 
 func _ready():
@@ -93,7 +103,11 @@ func _ready():
 	update_control_area()
 	reset_bucket_position()
 	update_layout()
+
 	setup_shaker_sound()
+	setup_pause_ui()
+	update_pause_ui_layout()
+
 	spawn_sprinkle()
 	queue_redraw()
 
@@ -101,17 +115,27 @@ func _ready():
 func _notification(what):
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		update_layout()
+		update_pause_ui_layout()
 		queue_redraw()
+
+
+func _unhandled_input(event):
+	if event.is_action_pressed("ui_cancel"):
+		set_game_paused(not game_paused)
 
 
 func _process(delta):
 	if game_ended:
 		return
 
+	if game_paused:
+		return
+
 	handle_bucket_input(delta)
 	catch_spices_touching_bucket()
 	update_shaker_timers(delta)
 	update_shaker_sound_cooldown(delta)
+
 	fall_timer += delta
 	spawn_timer += delta
 
@@ -123,11 +147,12 @@ func _process(delta):
 		spawn_timer = 0.0
 		spawn_sprinkle()
 
+
 func load_selected_template():
 	if get_tree().has_meta("selected_template_id"):
 		template_id = str(get_tree().get_meta("selected_template_id"))
 
-	var template_data := Data.get_template(template_id)
+	var template_data: Dictionary = Data.get_template(template_id)
 
 	template_name = template_data["name"]
 	template_shape = template_data["shape"]
@@ -154,6 +179,7 @@ func load_selected_template():
 	if spices.is_empty():
 		spices = Data.spices
 
+
 func set_common_grid_size_from_biggest_template():
 	var max_width: int = 1
 	var max_height: int = 1
@@ -166,6 +192,7 @@ func set_common_grid_size_from_biggest_template():
 
 	grid_width = max_width
 	grid_height = max_height
+
 
 func update_layout():
 	var viewport_size := get_viewport_rect().size
@@ -188,10 +215,8 @@ func update_layout():
 	var max_cell_from_width: float = floor(available_board_width / float(grid_width))
 	var max_cell_from_height: float = floor(available_board_height / float(grid_height))
 
-	cell_size = max(
-		MIN_CELL_SIZE,
-		int(min(max_cell_from_width, max_cell_from_height))
-	)
+	var fitted_cell_size: int = int(min(max_cell_from_width, max_cell_from_height))
+	cell_size = max(MIN_CELL_SIZE, fitted_cell_size)
 
 	board_pixel_width = grid_width * cell_size
 	board_pixel_height = grid_height * cell_size
@@ -247,46 +272,11 @@ func handle_bucket_input(delta):
 
 	bucket_move_timer = 0.0
 	queue_redraw()
+
+
 func get_spawn_row_below_shaker() -> int:
 	return 0
 
-func setup_shaker_sound():
-	shaker_audio_player = AudioStreamPlayer.new()
-
-	var shaker_stream: AudioStream = load(SHAKER_SOUND_PATH)
-
-	if shaker_stream == null:
-		push_warning("Could not load shaker sound from: " + SHAKER_SOUND_PATH)
-		return
-
-	shaker_audio_player.stream = shaker_stream
-	shaker_audio_player.volume_db = -8.0
-	add_child(shaker_audio_player)
-
-
-func play_shaker_sound():
-	if shaker_audio_player == null:
-		return
-
-	if shaker_audio_player.stream == null:
-		return
-
-	if shaker_sound_cooldown_timer > 0.0:
-		return
-
-	shaker_audio_player.pitch_scale = randf_range(0.96, 1.04)
-	shaker_audio_player.play()
-
-	shaker_sound_cooldown_timer = SHAKER_SOUND_COOLDOWN
-
-func update_shaker_sound_cooldown(delta):
-	if shaker_sound_cooldown_timer <= 0.0:
-		return
-
-	shaker_sound_cooldown_timer -= delta
-
-	if shaker_sound_cooldown_timer < 0.0:
-		shaker_sound_cooldown_timer = 0.0
 
 func create_empty_template():
 	template_grid.clear()
@@ -334,6 +324,7 @@ func create_template_from_shape():
 
 			template_grid[grid_y][grid_x] = int(shape_row[shape_x])
 
+
 func get_template_shape_width() -> int:
 	var max_width: int = 0
 
@@ -342,7 +333,8 @@ func get_template_shape_width() -> int:
 		max_width = max(max_width, row.size())
 
 	return max_width
-	
+
+
 func fill_floating_background_support_tiles():
 	for x in range(grid_width):
 		var found_template_above := false
@@ -354,6 +346,7 @@ func fill_floating_background_support_tiles():
 
 			if found_template_above:
 				settled_grid[y][x] = BACKGROUND_SETTLED_COLOR
+
 
 func update_template_spawn_bounds():
 	template_min_x = grid_width - 1
@@ -451,6 +444,7 @@ func choose_smart_spawn_column(available_columns: Array) -> int:
 		var target_spice_id := get_required_spice_id_for_section(target_section)
 
 		var global_need := 0
+
 		if target_spice_id != "":
 			global_need = get_remaining_template_cells_for_spice(target_spice_id)
 
@@ -762,6 +756,10 @@ func check_game_finished():
 	game_ended = true
 	falling_spices.clear()
 	final_message = template_name + " complete! Penalties: " + str(mistakes)
+
+	if pause_button != null:
+		pause_button.visible = false
+
 	print(final_message)
 	queue_redraw()
 
@@ -794,10 +792,55 @@ func grid_pos_key(grid_position: Vector2i) -> String:
 	return str(grid_position.x) + "," + str(grid_position.y)
 
 
+func setup_shaker_sound():
+	shaker_audio_player = AudioStreamPlayer.new()
+
+	var loaded_resource: Resource = load(SHAKER_SOUND_PATH)
+
+	if loaded_resource == null:
+		push_warning("Could not load shaker sound from: " + SHAKER_SOUND_PATH)
+		return
+
+	if not loaded_resource is AudioStream:
+		push_warning("Loaded shaker file is not an AudioStream: " + SHAKER_SOUND_PATH)
+		return
+
+	shaker_audio_player.stream = loaded_resource as AudioStream
+	shaker_audio_player.volume_db = -8.0
+	add_child(shaker_audio_player)
+
+
+func play_shaker_sound():
+	if shaker_audio_player == null:
+		return
+
+	if shaker_audio_player.stream == null:
+		return
+
+	if shaker_sound_cooldown_timer > 0.0:
+		return
+
+	shaker_audio_player.pitch_scale = randf_range(0.96, 1.04)
+	shaker_audio_player.play()
+
+	shaker_sound_cooldown_timer = SHAKER_SOUND_COOLDOWN
+
+
+func update_shaker_sound_cooldown(delta):
+	if shaker_sound_cooldown_timer <= 0.0:
+		return
+
+	shaker_sound_cooldown_timer -= delta
+
+	if shaker_sound_cooldown_timer < 0.0:
+		shaker_sound_cooldown_timer = 0.0
+
+
 func start_shaker_shake(column_x: int):
 	shaker_shake_timers[column_x] = SHAKER_SHAKE_DURATION
 	play_shaker_sound()
-	
+
+
 func update_shaker_timers(delta):
 	var keys: Array = shaker_shake_timers.keys()
 
@@ -810,13 +853,177 @@ func update_shaker_timers(delta):
 			shaker_shake_timers[key] = new_time
 
 
-func draw_game_panel():
-	var panel_rect := Rect2(game_panel_position, GAME_PANEL_SIZE)
+func setup_pause_ui():
+	pause_button = create_pause_icon_button("Pause", build_pause_icon(), PAUSE_BUTTON_SIZE, 16)
+	pause_button.pressed.connect(_on_pause_pressed)
+	add_child(pause_button)
 
-	draw_rect(panel_rect, Color(0.08, 0.07, 0.05), true)
-	draw_rect(panel_rect, Color(1, 1, 1, 0.12), false)
-	
-	
+	pause_overlay = ColorRect.new()
+	pause_overlay.color = Color(0, 0, 0, 0.55)
+	pause_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.visible = false
+	add_child(pause_overlay)
+
+	pause_panel = PanelContainer.new()
+	pause_panel.custom_minimum_size = PAUSE_MENU_SIZE
+	pause_panel.size = PAUSE_MENU_SIZE
+	pause_overlay.add_child(pause_panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 24)
+	margin.add_theme_constant_override("margin_bottom", 24)
+	pause_panel.add_child(margin)
+
+	var root := VBoxContainer.new()
+	root.alignment = BoxContainer.ALIGNMENT_CENTER
+	root.add_theme_constant_override("separation", 14)
+	margin.add_child(root)
+
+	var title := Label.new()
+	title.text = "PAUSED"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 30)
+	root.add_child(title)
+
+	var resume_button := create_pause_icon_button("Resume", build_resume_icon(), Vector2(245, 42), 18)
+	var options_button := create_pause_icon_button("Options", build_options_icon(), Vector2(245, 42), 18)
+	var restart_button := create_pause_icon_button("Restart Game", build_restart_icon(), Vector2(245, 42), 18)
+	var main_menu_button := create_pause_icon_button("Main Menu", build_main_menu_icon(), Vector2(245, 42), 18)
+
+	root.add_child(resume_button)
+	root.add_child(options_button)
+	root.add_child(restart_button)
+	root.add_child(main_menu_button)
+
+	resume_button.pressed.connect(_on_resume_pressed)
+	options_button.pressed.connect(_on_pause_options_pressed)
+	restart_button.pressed.connect(_on_restart_game_pressed)
+	main_menu_button.pressed.connect(_on_main_menu_pressed)
+
+	pause_options_dialog = AcceptDialog.new()
+	pause_options_dialog.title = "Options"
+	pause_options_dialog.dialog_text = "Options will be added later."
+	add_child(pause_options_dialog)
+
+
+func update_pause_ui_layout():
+	if pause_button == null:
+		return
+
+	var viewport_size := get_viewport_rect().size
+
+	if pause_overlay != null:
+		pause_overlay.size = viewport_size
+
+	pause_button.size = PAUSE_BUTTON_SIZE
+	pause_button.position = Vector2(
+		game_panel_position.x + GAME_PANEL_SIZE.x - PAUSE_BUTTON_SIZE.x - 14.0,
+		game_panel_position.y + 14.0
+	)
+
+	if pause_panel != null:
+		pause_panel.size = PAUSE_MENU_SIZE
+		pause_panel.position = Vector2(
+			(viewport_size.x - PAUSE_MENU_SIZE.x) / 2.0,
+			(viewport_size.y - PAUSE_MENU_SIZE.y) / 2.0
+		)
+
+
+func create_pause_icon_button(button_text: String, button_icon: Texture2D, button_size: Vector2, font_size: int) -> Button:
+	var button := Button.new()
+	button.text = ""
+	button.custom_minimum_size = button_size
+	button.size = button_size
+
+	apply_pixel_button_style(button)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(center)
+
+	var content := HBoxContainer.new()
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 8)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(content)
+
+	var icon_rect := TextureRect.new()
+	icon_rect.texture = button_icon
+	icon_rect.custom_minimum_size = Vector2(32, 32)
+	icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(icon_rect)
+
+	var label := Label.new()
+	label.text = button_text
+	label.add_theme_font_size_override("font_size", font_size)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(label)
+
+	return button
+
+
+func apply_pixel_button_style(button: Button):
+	var normal_style := StyleBoxFlat.new()
+	normal_style.bg_color = Color(0.13, 0.11, 0.08)
+	normal_style.border_color = Color(1.0, 0.85, 0.35)
+	normal_style.set_border_width_all(2)
+	normal_style.set_corner_radius_all(0)
+
+	var hover_style := StyleBoxFlat.new()
+	hover_style.bg_color = Color(0.20, 0.16, 0.10)
+	hover_style.border_color = Color(1.0, 0.95, 0.45)
+	hover_style.set_border_width_all(2)
+	hover_style.set_corner_radius_all(0)
+
+	var pressed_style := StyleBoxFlat.new()
+	pressed_style.bg_color = Color(0.08, 0.07, 0.05)
+	pressed_style.border_color = Color(0.90, 0.65, 0.20)
+	pressed_style.set_border_width_all(2)
+	pressed_style.set_corner_radius_all(0)
+
+	button.add_theme_stylebox_override("normal", normal_style)
+	button.add_theme_stylebox_override("hover", hover_style)
+	button.add_theme_stylebox_override("pressed", pressed_style)
+	button.add_theme_stylebox_override("focus", hover_style)
+
+
+func set_game_paused(value: bool):
+	game_paused = value
+
+	if pause_overlay != null:
+		pause_overlay.visible = game_paused
+
+	if pause_button != null:
+		pause_button.visible = not game_paused
+
+
+func _on_pause_pressed():
+	set_game_paused(true)
+
+
+func _on_resume_pressed():
+	set_game_paused(false)
+
+
+func _on_pause_options_pressed():
+	if pause_options_dialog != null:
+		pause_options_dialog.popup_centered()
+
+
+func _on_restart_game_pressed():
+	get_tree().reload_current_scene()
+
+
+func _on_main_menu_pressed():
+	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
+
+
 func _draw():
 	draw_game_panel()
 	draw_grid()
@@ -827,6 +1034,14 @@ func _draw():
 	draw_falling_spices()
 	draw_bucket()
 	draw_ui()
+
+
+func draw_game_panel():
+	var panel_rect := Rect2(game_panel_position, GAME_PANEL_SIZE)
+
+	draw_rect(panel_rect, Color(0.08, 0.07, 0.05), true)
+	draw_rect(panel_rect, Color(1, 1, 1, 0.12), false)
+
 
 func draw_grid():
 	for y in range(grid_height):
@@ -862,6 +1077,7 @@ func draw_shakers():
 
 		draw_salt_shaker_at_column(x)
 
+
 func draw_salt_shaker_at_column(column_x: int):
 	var shake_time: float = float(shaker_shake_timers.get(column_x, 0.0))
 	var shake_offset: float = 0.0
@@ -883,21 +1099,17 @@ func draw_salt_shaker_at_column(column_x: int):
 	var shadow_color := Color(0.62, 0.62, 0.58)
 	var hole_color := Color(0.08, 0.08, 0.08)
 
-	# Upside-down body
 	for gy in range(0, 4):
 		for gx in range(0, 5):
 			draw_shaker_pixel(origin, pixel_size, gx, gy, body_color)
 
-	# Shadow side
 	for gy in range(0, 4):
 		draw_shaker_pixel(origin, pixel_size, 4, gy, shadow_color)
 
-	# Holes near the bottom because the shaker is upside down
 	draw_shaker_pixel(origin, pixel_size, 1, 4, hole_color)
 	draw_shaker_pixel(origin, pixel_size, 2, 4, hole_color)
 	draw_shaker_pixel(origin, pixel_size, 3, 4, hole_color)
 
-	# Bottom cap/lid
 	for gx in range(0, 5):
 		draw_shaker_pixel(origin, pixel_size, gx, 5, cap_color)
 
@@ -907,11 +1119,11 @@ func draw_salt_shaker_at_column(column_x: int):
 	var outline_rect := Rect2(origin, Vector2(pixel_size * 5.0, pixel_size * 7.0))
 	draw_rect(outline_rect, Color(0.1, 0.1, 0.1), false)
 
-	# Small visual drop point below the shaker
 	var drop_x: float = grid_offset.x + float(column_x * cell_size) + float(cell_size) / 2.0
 	var drop_y: float = grid_offset.y - 3.0
 	draw_circle(Vector2(drop_x, drop_y), max(1.5, pixel_size * 0.35), Color(1, 1, 1, 0.65))
-	
+
+
 func draw_shaker_pixel(origin: Vector2, pixel_size: float, grid_x: int, grid_y: int, color: Color):
 	var pixel_position := origin + Vector2(grid_x * pixel_size, grid_y * pixel_size)
 	var pixel_rect := Rect2(pixel_position, Vector2(pixel_size, pixel_size))
@@ -941,7 +1153,7 @@ func draw_template_preview():
 				template_color.a = 0.25
 				draw_rect(cell_rect, template_color, true)
 
-			# No inner border here.
+
 func get_template_preview_color(section_id: int) -> Color:
 	if template_preview_colors.has(section_id):
 		return template_preview_colors[section_id]
@@ -962,7 +1174,6 @@ func draw_settled_spices():
 
 			draw_rect(cell_rect, settled_color, true)
 
-			# No white border here.
 
 func draw_falling_spices():
 	for spice in falling_spices:
@@ -999,3 +1210,109 @@ func draw_ui():
 		22,
 		Color.WHITE
 	)
+
+
+func build_pause_icon() -> Texture2D:
+	return create_pixel_icon([
+		"........",
+		"..yy.yy.",
+		"..yy.yy.",
+		"..yy.yy.",
+		"..yy.yy.",
+		"..yy.yy.",
+		"........",
+		"........"
+	], {
+		"y": Color(1.0, 0.86, 0.25)
+	})
+
+
+func build_resume_icon() -> Texture2D:
+	return create_pixel_icon([
+		"..g.....",
+		"..gg....",
+		"..ggg...",
+		"..gggg..",
+		"..ggg...",
+		"..gg....",
+		"..g.....",
+		"........"
+	], {
+		"g": Color(0.35, 0.95, 0.35)
+	})
+
+
+func build_options_icon() -> Texture2D:
+	return create_pixel_icon([
+		"..gggg..",
+		".gg..gg.",
+		"ggg..ggg",
+		"g..ww..g",
+		"g..ww..g",
+		"ggg..ggg",
+		".gg..gg.",
+		"..gggg.."
+	], {
+		"g": Color(0.70, 0.70, 0.75),
+		"w": Color(0.92, 0.92, 0.95)
+	})
+
+
+func build_restart_icon() -> Texture2D:
+	return create_pixel_icon([
+		"..yyyy..",
+		".y....y.",
+		"y..yy.y.",
+		"y.y...y.",
+		"y..yyyy.",
+		".y......",
+		"..yyyy..",
+		"........"
+	], {
+		"y": Color(1.0, 0.80, 0.20)
+	})
+
+
+func build_main_menu_icon() -> Texture2D:
+	return create_pixel_icon([
+		"...r....",
+		"..rrr...",
+		".rrrrr..",
+		"rrbybrr.",
+		"..bbb...",
+		"..bbb...",
+		"..bbb...",
+		"........"
+	], {
+		"r": Color(0.85, 0.25, 0.20),
+		"b": Color(0.55, 0.32, 0.12),
+		"y": Color(1.0, 0.85, 0.25)
+	})
+
+
+func create_pixel_icon(pattern: Array, palette: Dictionary, pixel_size: int = 4) -> Texture2D:
+	var rows: int = pattern.size()
+	var cols: int = String(pattern[0]).length()
+
+	var image := Image.create(cols * pixel_size, rows * pixel_size, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+
+	for y in range(rows):
+		var row: String = String(pattern[y])
+
+		for x in range(cols):
+			var key: String = row.substr(x, 1)
+
+			if key == ".":
+				continue
+
+			if not palette.has(key):
+				continue
+
+			var color: Color = palette[key]
+
+			for py in range(pixel_size):
+				for px in range(pixel_size):
+					image.set_pixel(x * pixel_size + px, y * pixel_size + py, color)
+
+	return ImageTexture.create_from_image(image)
