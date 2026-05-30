@@ -1,7 +1,7 @@
 extends Node2D
 
 const CELL_SIZE := 20
-const GRID_WIDTH := 20
+const GRID_WIDTH := 30
 const GRID_HEIGHT := 30
 
 const FALL_INTERVAL := 0.15
