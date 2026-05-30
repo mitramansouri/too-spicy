@@ -20,7 +20,6 @@ const texts = {
 }
 
 const MENU_SIZE := Vector2(460, 580)
-
 const SQUARES_PER_CLICK := 8
 
 var background: ColorRect
@@ -34,8 +33,6 @@ var blocked_art_button: Button
 var options_button: Button
 var credits_button: Button
 var quit_button: Button
-
-var current_pressed_button
 
 
 func _ready():
@@ -56,10 +53,12 @@ func _notification(what):
 	if what == NOTIFICATION_RESIZED:
 		center_menu()
 
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if title_label.get_global_rect().has_point(event.global_position):
 			_spawn_squares(event.global_position)
+
 
 func _spawn_squares(origin: Vector2) -> void:
 	for i in range(SQUARES_PER_CLICK):
@@ -67,7 +66,10 @@ func _spawn_squares(origin: Vector2) -> void:
 		square.set_script(load("res://scripts/FallingSquare.gd"))
 		square.position = origin + Vector2(randf_range(-100.0, 100.0), randf_range(-10.0, 10.0))
 		add_child(square)
-		if randi() % 2 == 0: move_child(square, 1)
+
+		if randi() % 2 == 0:
+			move_child(square, 1)
+
 
 func create_background():
 	background = ColorRect.new()
@@ -119,14 +121,14 @@ func create_menu():
 
 	root.add_child(easy_mode_button)
 	root.add_child(blocked_art_button)
-	
+
 	var sep = SquigglySeparator.new()
 	sep.color = Color(1, 1, 1, 0.5)
 	sep.dynamic = true
 	sep.period_length_s = 3.0
 	root.add_child(sep)
-	
-	root.add_child(how_to_play_button)	
+
+	root.add_child(how_to_play_button)
 	root.add_child(options_button)
 	root.add_child(credits_button)
 
@@ -136,7 +138,7 @@ func create_menu():
 	sep.period_length_s = 3.0
 	sep.direction = -1
 	root.add_child(sep)
-	
+
 	root.add_child(quit_button)
 
 	easy_mode_button.pressed.connect(_on_easy_mode_pressed)
@@ -160,14 +162,13 @@ func center_menu():
 	)
 
 
-func create_button(button_type: ButtonType) -> Button:
+func create_button(button_type: int) -> Button:
 	var button := Button.new()
 	button.text = ButtonName[button_type]
 	button.custom_minimum_size = Vector2(340, 42)
 	button.add_theme_font_size_override("font_size", 20)
-	
+
 	if button_type == ButtonType.QUIT:
-		# button.add_theme_color_override("font_color", Color.RED)
 		var style = StyleBoxFlat.new()
 		style.border_color = Color.RED
 		style.border_blend = false
@@ -175,31 +176,39 @@ func create_button(button_type: ButtonType) -> Button:
 		style.set_border_width_all(2)
 		style.bg_color = Color.RED
 		button.add_theme_stylebox_override("hover", style)
-	
+
 	return button
+
 
 func show_welcome_text():
 	info_label.text = "Catch, block, and guide falling spices to complete the hidden template."
 
+
 func _on_easy_mode_pressed():
-	get_tree().change_scene_to_file("res://scenes/Game.tscn")
+	get_tree().change_scene_to_file("res://scenes/TemplateSelect.tscn")
+
 
 func _on_blocked_art_button_pressed():
 	show_dialog(ButtonType.BLOCKED_ART)
 
-func show_dialog(button_type: ButtonType):
+
+func show_dialog(button_type: int):
 	dialog.title = ButtonName[button_type]
 	dialog.dialog_text = texts[button_type]
 	dialog.popup_centered()
 
+
 func _on_how_to_play_button_pressed():
 	show_dialog(ButtonType.HOW_TO_PLAY)
+
 
 func _on_options_button_pressed():
 	show_dialog(ButtonType.OPTIONS)
 
+
 func _on_credits_button_pressed():
 	show_dialog(ButtonType.CREDITS)
+
 
 func _on_quit_pressed():
 	get_tree().quit()

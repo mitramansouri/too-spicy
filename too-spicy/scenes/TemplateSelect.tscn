@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://5ntsj3xp7wqr"]
+
+[ext_resource type="Script" uid="uid://b8ejput047vsa" path="res://scripts/TemplateSelect.gd" id="1_mprrt"]
+
+[node name="TemplateSelect" type="Control" unique_id=1287954818]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_mprrt")
