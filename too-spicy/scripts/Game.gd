@@ -133,7 +133,7 @@ func _unhandled_input(event):
 
 func _process(delta):
 	if game_ended:
-		return
+		get_tree().change_scene_to_file("res://scenes/EndGame.tscn")
 
 	if game_paused:
 		return
