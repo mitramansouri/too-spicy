@@ -1,7 +1,10 @@
 extends Node2D
 
 const Data = preload("res://scripts/Data.gd")
-
+const GAME_PANEL_SIZE := Vector2(460, 580)
+const GAME_PANEL_PADDING := 24.0
+const PENALTY_TEXT_HEIGHT := 36.0
+const MIN_CELL_SIZE := 16
 const SIDE_PANEL_WIDTH := 360
 const SIDE_PANEL_GAP := 40
 const SHAKER_PIXEL_ROWS: float = 7.0
@@ -16,6 +19,8 @@ const SHAKER_SOUND_RATE := 22050
 const SHAKER_SOUND_COOLDOWN := 0.12
 var shaker_audio_player: AudioStreamPlayer
 var shaker_sound_cooldown_timer := 0.0
+var game_panel_position := Vector2.ZERO
+var template_left_x := 0
 var cell_size := 20
 var grid_width := 20
 var grid_height := 30
@@ -118,7 +123,6 @@ func _process(delta):
 		spawn_timer = 0.0
 		spawn_sprinkle()
 
-
 func load_selected_template():
 	if get_tree().has_meta("selected_template_id"):
 		template_id = str(get_tree().get_meta("selected_template_id"))
@@ -134,9 +138,7 @@ func load_selected_template():
 	board_bg_color = template_data.get("board_bg_color", board_bg_color)
 	grid_line_color = template_data.get("grid_line_color", grid_line_color)
 
-	grid_width = int(template_data["grid_width"])
-	grid_height = int(template_data["grid_height"])
-	cell_size = int(template_data["cell_size"])
+	set_common_grid_size_from_biggest_template()
 
 	bucket_width = int(template_data["bucket_width"])
 	bucket_height = int(template_data["bucket_height"])
@@ -152,28 +154,58 @@ func load_selected_template():
 	if spices.is_empty():
 		spices = Data.spices
 
-	board_pixel_width = grid_width * cell_size
-	board_pixel_height = grid_height * cell_size
+func set_common_grid_size_from_biggest_template():
+	var max_width: int = 1
+	var max_height: int = 1
 
+	for template_key in Data.templates.keys():
+		var template_data: Dictionary = Data.templates[template_key]
+
+		max_width = max(max_width, int(template_data["grid_width"]))
+		max_height = max(max_height, int(template_data["grid_height"]))
+
+	grid_width = max_width
+	grid_height = max_height
 
 func update_layout():
 	var viewport_size := get_viewport_rect().size
 
+	game_panel_position = Vector2(
+		(viewport_size.x - GAME_PANEL_SIZE.x) / 2.0,
+		(viewport_size.y - GAME_PANEL_SIZE.y) / 2.0
+	)
+
+	var shaker_space: float = SHAKER_TOP_PADDING + SHAKER_BOTTOM_GAP
+
+	var available_board_width: float = GAME_PANEL_SIZE.x - GAME_PANEL_PADDING * 2.0
+	var available_board_height: float = (
+		GAME_PANEL_SIZE.y
+		- GAME_PANEL_PADDING * 2.0
+		- PENALTY_TEXT_HEIGHT
+		- shaker_space
+	)
+
+	var max_cell_from_width: float = floor(available_board_width / float(grid_width))
+	var max_cell_from_height: float = floor(available_board_height / float(grid_height))
+
+	cell_size = max(
+		MIN_CELL_SIZE,
+		int(min(max_cell_from_width, max_cell_from_height))
+	)
+
 	board_pixel_width = grid_width * cell_size
 	board_pixel_height = grid_height * cell_size
 
-	var shaker_space: float = SHAKER_TOP_PADDING + SHAKER_BOTTOM_GAP
-	var total_width := board_pixel_width + SIDE_PANEL_GAP + SIDE_PANEL_WIDTH
-	var total_height := board_pixel_height + shaker_space
-
-	var start_x := (viewport_size.x - total_width) / 2.0
-	var start_y := (viewport_size.y - total_height) / 2.0 + shaker_space
-
-	grid_offset = Vector2(start_x, start_y)
-	ui_offset = Vector2(
-		grid_offset.x + board_pixel_width + SIDE_PANEL_GAP,
-		grid_offset.y + 40
+	grid_offset = Vector2(
+		game_panel_position.x + (GAME_PANEL_SIZE.x - float(board_pixel_width)) / 2.0,
+		game_panel_position.y + GAME_PANEL_PADDING + PENALTY_TEXT_HEIGHT + shaker_space
 	)
+
+	ui_offset = Vector2(
+		game_panel_position.x + GAME_PANEL_PADDING,
+		game_panel_position.y + GAME_PANEL_PADDING + 22.0
+	)
+
 
 func handle_bucket_input(delta):
 	bucket_move_timer += delta
@@ -281,14 +313,17 @@ func create_empty_settled_grid():
 
 
 func create_template_from_shape():
-	var shape_height := template_shape.size()
+	var shape_height: int = template_shape.size()
+	var shape_width: int = get_template_shape_width()
+
+	template_left_x = int((grid_width - shape_width) / 2)
 	template_top_y = grid_height - shape_height
 
 	for shape_y in range(shape_height):
 		var shape_row: Array = template_shape[shape_y]
 
 		for shape_x in range(shape_row.size()):
-			var grid_x := shape_x
+			var grid_x := template_left_x + shape_x
 			var grid_y := template_top_y + shape_y
 
 			if grid_x < 0 or grid_x >= grid_width:
@@ -299,6 +334,15 @@ func create_template_from_shape():
 
 			template_grid[grid_y][grid_x] = int(shape_row[shape_x])
 
+func get_template_shape_width() -> int:
+	var max_width: int = 0
+
+	for row_value in template_shape:
+		var row: Array = row_value
+		max_width = max(max_width, row.size())
+
+	return max_width
+	
 func fill_floating_background_support_tiles():
 	for x in range(grid_width):
 		var found_template_above := false
@@ -766,7 +810,15 @@ func update_shaker_timers(delta):
 			shaker_shake_timers[key] = new_time
 
 
+func draw_game_panel():
+	var panel_rect := Rect2(game_panel_position, GAME_PANEL_SIZE)
+
+	draw_rect(panel_rect, Color(0.08, 0.07, 0.05), true)
+	draw_rect(panel_rect, Color(1, 1, 1, 0.12), false)
+	
+	
 func _draw():
+	draw_game_panel()
 	draw_grid()
 	draw_control_area()
 	draw_shakers()
@@ -775,7 +827,6 @@ func _draw():
 	draw_falling_spices()
 	draw_bucket()
 	draw_ui()
-
 
 func draw_grid():
 	for y in range(grid_height):
@@ -942,68 +993,9 @@ func draw_ui():
 	draw_string(
 		ThemeDB.fallback_font,
 		ui_offset,
-		"Template: " + template_name,
+		"Penalties: " + str(mistakes),
 		HORIZONTAL_ALIGNMENT_LEFT,
-		SIDE_PANEL_WIDTH,
+		int(GAME_PANEL_SIZE.x - GAME_PANEL_PADDING * 2.0),
 		22,
 		Color.WHITE
 	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		ui_offset + Vector2(0, 32),
-		"Penalties: " + str(mistakes),
-		HORIZONTAL_ALIGNMENT_LEFT,
-		SIDE_PANEL_WIDTH,
-		20,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		ui_offset + Vector2(0, 62),
-		"Open shakers: " + str(get_available_spawn_columns().size()),
-		HORIZONTAL_ALIGNMENT_LEFT,
-		SIDE_PANEL_WIDTH,
-		20,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		ui_offset + Vector2(0, 102),
-		"Falling spices:",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		SIDE_PANEL_WIDTH,
-		20,
-		Color.WHITE
-	)
-
-	for i in range(spices.size()):
-		var spice = spices[i]
-		var row_y := 132 + i * 28
-		var spice_rect := Rect2(ui_offset + Vector2(0, row_y - 16), Vector2(18, 18))
-
-		draw_rect(spice_rect, spice["color"], true)
-		draw_rect(spice_rect, Color.WHITE, false)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			ui_offset + Vector2(28, row_y),
-			spice["name"],
-			HORIZONTAL_ALIGNMENT_LEFT,
-			SIDE_PANEL_WIDTH,
-			18,
-			Color.WHITE
-		)
-
-	if game_ended:
-		draw_string(
-			ThemeDB.fallback_font,
-			ui_offset + Vector2(0, 240),
-			final_message,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			SIDE_PANEL_WIDTH,
-			24,
-			Color.YELLOW
-		)
