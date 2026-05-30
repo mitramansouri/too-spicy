@@ -75,7 +75,7 @@ var spawn_timer := 0.0
 var bucket_move_timer := 0.0
 
 var bucket_pos := Vector2i.ZERO
-var mistakes := 0
+@export var mistakes := 0
 
 var game_ended := false
 var final_message := ""
@@ -133,6 +133,8 @@ func _unhandled_input(event):
 
 func _process(delta):
 	if game_ended:
+		GameData.mistakes = mistakes
+		GameData.number_of_tiles = 50
 		get_tree().change_scene_to_file("res://scenes/EndGame.tscn")
 
 	if game_paused:

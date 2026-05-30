@@ -6,9 +6,10 @@ const ButtonName = Data.ButtonName
 
 var panel : PanelContainer
 const PANEL_SIZE := Vector2(460, 580)
+
 var progress_bar: TrapezoidBar
 var bar_label: Label
-var penality_ratio := 0.57
+var penality_ratio = float(GameData.mistakes) / float(GameData.number_of_tiles)
 
 func _ready():
 	# ================================
