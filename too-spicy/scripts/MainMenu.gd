@@ -96,8 +96,8 @@ func create_menu():
 	menu_panel.add_child(margin)
 
 	var root := VBoxContainer.new()
-	root.alignment = BoxContainer.ALIGNMENT_CENTER
-	root.add_theme_constant_override("separation", 14)
+	root.alignment = BoxContainer.ALIGNMENT_BEGIN
+	root.add_theme_constant_override("separation",10)
 	margin.add_child(root)
 
 	title_label = Label.new()
@@ -158,21 +158,42 @@ func center_menu():
 
 	var viewport_size := get_viewport_rect().size
 
-	menu_panel.size = MENU_SIZE
+	#menu_panel.size = MENU_SIZE
+	menu_panel.size = Vector2(MENU_SIZE.x, viewport_size.x) 
 	menu_panel.position = Vector2(
 		(viewport_size.x - MENU_SIZE.x) / 2.0,
-		(viewport_size.y - MENU_SIZE.y) / 2.0
+		0
+		#(viewport_size.y - MENU_SIZE.y) / 2.0
 	)
-
 
 func create_button(button_type: int) -> Button:
 	var button := Button.new()
-	button.text = ButtonName[button_type]
+	button.text = ""
 	button.custom_minimum_size = Vector2(340, 46)
-	button.add_theme_font_size_override("font_size", 20)
-	button.add_theme_constant_override("h_separation", 12)
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.icon = build_button_icon(button_type)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(center)
+
+	var content := HBoxContainer.new()
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 8)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(content)
+
+	var icon_rect := TextureRect.new()
+	icon_rect.texture = build_button_icon(button_type)
+	icon_rect.custom_minimum_size = Vector2(32, 32)
+	icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(icon_rect)
+
+	var label := Label.new()
+	label.text = ButtonName[button_type]
+	label.add_theme_font_size_override("font_size", 20)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(label)
 
 	if button_type == ButtonType.QUIT:
 		var style := StyleBoxFlat.new()
@@ -184,7 +205,6 @@ func create_button(button_type: int) -> Button:
 		button.add_theme_stylebox_override("hover", style)
 
 	return button
-
 
 func build_button_icon(button_type: int) -> Texture2D:
 	match button_type:

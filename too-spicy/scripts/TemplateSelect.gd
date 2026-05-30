@@ -2,7 +2,7 @@ extends Control
 
 const Data = preload("res://scripts/Data.gd")
 
-const MENU_SIZE := Vector2(500, 440)
+const MENU_SIZE := Vector2(460, 580)
 
 var background: ColorRect
 var menu_panel: PanelContainer
@@ -73,11 +73,9 @@ func create_menu():
 		root.add_child(button)
 		button.pressed.connect(_on_template_pressed.bind(template_id))
 
-	back_button = create_button("Back")
-	back_button.icon = build_back_icon()
+	back_button = build_back_button()
 	root.add_child(back_button)
 	back_button.pressed.connect(_on_back_pressed)
-
 
 func center_menu():
 	if menu_panel == null:
@@ -85,29 +83,56 @@ func center_menu():
 
 	var viewport_size := get_viewport_rect().size
 
-	menu_panel.size = MENU_SIZE
+	menu_panel.size = Vector2(MENU_SIZE.x, viewport_size.y)
 	menu_panel.position = Vector2(
 		(viewport_size.x - MENU_SIZE.x) / 2.0,
-		(viewport_size.y - MENU_SIZE.y) / 2.0
+		0
+		#(viewport_size.y - MENU_SIZE.y) / 2.0
 	)
 
-
 func create_template_button(template_id: String, button_text: String) -> Button:
-	var button := create_button(button_text)
-	button.icon = build_template_icon(template_id)
+	var button := create_button(button_text, build_template_icon(template_id))
 	return button
 
 
-func create_button(button_text: String) -> Button:
+func create_button(button_text: String, button_icon: Texture2D = null) -> Button:
 	var button := Button.new()
-	button.text = button_text
+	button.text = ""
 	button.custom_minimum_size = Vector2(360, 46)
-	button.add_theme_font_size_override("font_size", 20)
-	button.add_theme_constant_override("h_separation", 12)
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(center)
+
+	var content := HBoxContainer.new()
+	content.alignment = BoxContainer.ALIGNMENT_BEGIN
+	content.add_theme_constant_override("separation", 8)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(content)
+
+	if button_icon != null:
+		var icon_rect := TextureRect.new()
+		icon_rect.texture = button_icon
+		icon_rect.custom_minimum_size = Vector2(32, 32)
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		content.add_child(icon_rect)
+
+	var label := Label.new()
+	label.text = button_text
+	label.add_theme_font_size_override("font_size", 20)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(label)
+
 	return button
 
 
+func build_back_button() -> Button:
+	return create_button("Back", build_back_icon())
+	
 func build_template_icon(template_id: String) -> Texture2D:
 	match template_id:
 		Data.TEMPLATE_CUPCAKE:

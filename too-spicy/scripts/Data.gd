@@ -143,7 +143,7 @@ const templates := {
 		"id": TEMPLATE_CUPCAKE,
 		"name": "Cupcake",
 		"description": "A small beginner cupcake with frosting and a wrapper.",
-		"grid_width": 9,
+		"grid_width": 7,
 		"grid_height": 18,
 		"cell_size": 34,
 		"bucket_width": 2,
@@ -151,7 +151,7 @@ const templates := {
 		"spices_per_sprinkle": 2,
 		"max_falling_spices": 5,
 		"fall_interval": 0.45,
-		"spawn_interval": 0.75,
+		"spawn_interval": 0.85,
 		"allowed_spices": [
 			SPICE_PAPRIKA,
 			SPICE_SALT,
@@ -177,9 +177,9 @@ const templates := {
 	[0, 1, 1, 2, 1, 1, 0],
 	[1, 1, 1, 1, 1, 1, 1],
 	[1, 1, 1, 1, 1, 1, 1],
-	[0, 3, 3, 3, 3, 3, 0],
-	[0, 3, 3, 3, 3, 3, 0],
-	[0, 3, 3, 3, 3, 3, 0]
+	[3, 3, 3, 3, 3, 3, 3],
+	[3, 3, 3, 3, 3, 3, 3],
+	[3, 3, 3, 3, 3, 3, 3]
 ]
 	},
 

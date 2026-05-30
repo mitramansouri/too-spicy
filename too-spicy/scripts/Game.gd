@@ -32,7 +32,7 @@ var bucket_move_interval := 0.08
 var control_area_x := 0
 var control_area_y := 3
 var control_area_width := 20
-var control_area_height := 17
+var control_area_height := 10
 
 var board_pixel_width := 0
 var board_pixel_height := 0
