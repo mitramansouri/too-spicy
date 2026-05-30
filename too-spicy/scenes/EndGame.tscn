@@ -6,8 +6,3 @@
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("1_i47uf")
-
-[node name="Label" type="Label" parent="." unique_id=427335111]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 23.0

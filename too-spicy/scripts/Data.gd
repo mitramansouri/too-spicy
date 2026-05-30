@@ -1,4 +1,4 @@
-enum ButtonType {EASY_MODE, BLOCKED_ART, HOW_TO_PLAY, OPTIONS, CREDITS, QUIT}
+enum ButtonType {EASY_MODE, BLOCKED_ART, HOW_TO_PLAY, OPTIONS, CREDITS, QUIT, MAIN_MENU}
 
 const ButtonName = {
 	ButtonType.EASY_MODE: "Play Template", 
@@ -6,7 +6,8 @@ const ButtonName = {
 	ButtonType.HOW_TO_PLAY: "How to Play", 
 	ButtonType.OPTIONS: "Options", 
 	ButtonType.CREDITS: "Credits",
-	ButtonType.QUIT: "Quit"
+	ButtonType.QUIT: "Quit",
+	ButtonType.MAIN_MENU: "Main Menu"
 }
 
 const SPICE_SALT := "salt"
