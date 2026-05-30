@@ -36,8 +36,8 @@ var board_pixel_height := 0
 var grid_offset := Vector2.ZERO
 var ui_offset := Vector2.ZERO
 
-var board_bg_color := Color(0.08, 0.08, 0.08)
-var grid_line_color := Color(0.25, 0.25, 0.25)
+var board_bg_color := Color(0.294, 0.294, 0.294, 1.0)
+var grid_line_color := Color(0.196, 0.196, 0.196, 0.0)
 
 var template_id := Data.TEMPLATE_CUPCAKE
 var template_name := "Cupcake"
@@ -78,6 +78,7 @@ func _ready():
 	create_empty_template()
 	create_empty_settled_grid()
 	create_template_from_shape()
+	fill_floating_background_support_tiles()
 	update_template_spawn_bounds()
 	reset_section_colors()
 	update_control_area()
@@ -126,8 +127,8 @@ func load_selected_template():
 	template_preview_colors = template_data["preview_colors"]
 	template_section_spices = template_data.get("section_spices", {})
 
-	board_bg_color = template_data.get("board_bg_color", Color(0.08, 0.08, 0.08))
-	grid_line_color = template_data.get("grid_line_color", Color(0.25, 0.25, 0.25))
+	board_bg_color = template_data.get("board_bg_color", board_bg_color)
+	grid_line_color = template_data.get("grid_line_color", grid_line_color)
 
 	grid_width = int(template_data["grid_width"])
 	grid_height = int(template_data["grid_height"])
@@ -256,6 +257,17 @@ func create_template_from_shape():
 
 			template_grid[grid_y][grid_x] = int(shape_row[shape_x])
 
+func fill_floating_background_support_tiles():
+	for x in range(grid_width):
+		var found_template_above := false
+
+		for y in range(grid_height):
+			if template_grid[y][x] != 0:
+				found_template_above = true
+				continue
+
+			if found_template_above:
+				settled_grid[y][x] = BACKGROUND_SETTLED_COLOR
 
 func update_template_spawn_bounds():
 	template_min_x = grid_width - 1
@@ -835,9 +847,7 @@ func draw_template_preview():
 				template_color.a = 0.25
 				draw_rect(cell_rect, template_color, true)
 
-			draw_rect(cell_rect, Color(1, 1, 1, 0.5), false)
-
-
+			# No inner border here.
 func get_template_preview_color(section_id: int) -> Color:
 	if template_preview_colors.has(section_id):
 		return template_preview_colors[section_id]
@@ -857,8 +867,8 @@ func draw_settled_spices():
 			var cell_rect := Rect2(draw_position, Vector2(cell_size, cell_size))
 
 			draw_rect(cell_rect, settled_color, true)
-			draw_rect(cell_rect, Color.WHITE, false)
 
+			# No white border here.
 
 func draw_falling_spices():
 	for spice in falling_spices:

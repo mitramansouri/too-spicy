@@ -128,20 +128,19 @@ func build_template_icon(template_id: String) -> Texture2D:
 
 		Data.TEMPLATE_CANDLE:
 			return create_pixel_icon([
-				"...y....",
-				"..yyy...",
-				"...b....",
-				"..www...",
-				"..www...",
-				"..www...",
-				"..www...",
-				"........"
+				"...rr...",
+				"..rrrr..",
+				".rrwrrr.",
+				"rrrrrrrr",
+				".rwwwwr.",
+				"..rbbbr.",
+				"...bbb..",
+				"...bbb.."
 			], {
-				"y": Color.YELLOW,
-				"b": Color.BLACK,
-				"w": Color.WHITE
+				"r": Color.RED,
+				"w": Color.WHITE,
+				"b": Color(0.96, 0.92, 0.70)
 			})
-
 		Data.TEMPLATE_TURTLE:
 			return create_pixel_icon([
 				"..ggg...",

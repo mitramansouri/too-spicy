@@ -1,7 +1,7 @@
 enum ButtonType {EASY_MODE, BLOCKED_ART, HOW_TO_PLAY, OPTIONS, CREDITS, QUIT}
 
 const ButtonName = {
-	ButtonType.EASY_MODE: "Easy Mode", 
+	ButtonType.EASY_MODE: "Play Template", 
 	ButtonType.BLOCKED_ART: "Blocked Art", 
 	ButtonType.HOW_TO_PLAY: "How to Play", 
 	ButtonType.OPTIONS: "Options", 
@@ -18,6 +18,7 @@ const SPICE_HERBS := "herbs"
 const SPICE_BLUEBERRY := "blueberry"
 const SPICE_GARLIC := "garlic"
 const SPICE_CHILI := "chili"
+const SPICE_LIME := "lime"
 
 const spices := [
 	{
@@ -64,6 +65,11 @@ const spices := [
 		"id": SPICE_CHILI,
 		"name": "Chili Powder",
 		"color": Color(1.0, 0.45, 0.0)
+	},
+	{
+	"id": SPICE_LIME,
+	"name": "Lime Zest",
+	"color": Color(0.62, 0.76, 0.00)
 	}
 ]
 
@@ -112,6 +118,11 @@ const spice_by_id := {
 	"id": SPICE_CHILI,
 	"name": "Chili Powder",
 	"color": Color(1.0, 0.45, 0.0)
+	},
+	SPICE_LIME: {
+	"id": SPICE_LIME,
+	"name": "Lime Zest",
+	"color": Color(0.62, 0.76, 0.00)
 	}
 }
 
@@ -174,94 +185,93 @@ const templates := {
 
 TEMPLATE_CANDLE: {
 	"id": TEMPLATE_CANDLE,
-	"name": "Candle",
-	"description": "A very easy vertical candle.",
-	"grid_width": 5,
+	"name": "Mushroom",
+	"description": "A cute simple mushroom without the black outline.",
+	"grid_width": 12,
 	"grid_height": 18,
-	"cell_size": 30,
+	"cell_size": 28,
+	"bucket_width": 2,
+	"bucket_height": 1,
+	"spices_per_sprinkle": 2,
+	"max_falling_spices": 8,
+	"fall_interval": 0.45,
+	"spawn_interval": 0.75,
+	"allowed_spices": [
+		SPICE_PAPRIKA,
+		SPICE_SALT,
+		SPICE_GARLIC
+	],
+	"sections": {
+		1: "Cap",
+		2: "Spots",
+		3: "Stem"
+	},
+	"section_spices": {
+		1: SPICE_PAPRIKA,
+		2: SPICE_SALT,
+		3: SPICE_GARLIC
+	},
+	"preview_colors": {
+		1: Color.RED,
+		2: Color.WHITE,
+		3: Color(0.96, 0.92, 0.70)
+	},
+	"shape": [
+		[0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+		[0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+		[0, 0, 1, 1, 2, 1, 1, 2, 1, 1, 0, 0],
+		[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+		[1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1],
+		[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+		[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+		[0, 0, 1, 1, 1, 3, 3, 1, 1, 1, 0, 0],
+		[0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0],
+		[0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0],
+		[0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0]
+	]
+},
+TEMPLATE_TURTLE: {
+	"id": TEMPLATE_TURTLE,
+	"name": "Small Turtle",
+	"description": "A tiny simple turtle with a dark shell and light body.",
+	"grid_width": 11,
+	"grid_height": 16,
+	"cell_size": 36,
 	"bucket_width": 2,
 	"bucket_height": 1,
 	"spices_per_sprinkle": 3,
-	"max_falling_spices": 10,
-	"fall_interval": 0.5,
-	"spawn_interval": 0.85,
+	"max_falling_spices": 8,
+	"fall_interval": 0.45,
+	"spawn_interval": 0.8,
 	"allowed_spices": [
-		SPICE_SALT,
-		SPICE_TURMERIC,
+		SPICE_HERBS,
+		SPICE_LIME,
 		SPICE_PEPPER
 	],
 	"sections": {
-		1: "Wax",
-		2: "Flame",
-		3: "Wick"
+		1: "Shell",
+		2: "Body",
+		3: "Eye"
 	},
 	"section_spices": {
-		1: SPICE_SALT,
-		2: SPICE_TURMERIC,
+		1: SPICE_HERBS,
+		2: SPICE_LIME,
 		3: SPICE_PEPPER
 	},
 	"preview_colors": {
-		1: Color.WHITE,
-		2: Color.YELLOW,
+		1: Color.GREEN,
+		2: Color(0.62, 0.76, 0.00),
 		3: Color.BLACK
 	},
 	"shape": [
-		[0, 0, 2, 0, 0],
-		[0, 2, 2, 2, 0],
-		[0, 1, 3, 1, 0],
-		[0, 1, 1, 1, 1],
-		[0, 1, 1, 1, 1],
-		[1, 1, 1, 1, 1],
-		[1, 1, 1, 1, 1],
-		[1, 1, 1, 1, 1],
-		[1, 1, 1, 1, 1],
-		[1, 1, 1, 1, 1]
+		[0, 0, 0, 1, 1, 0, 0, 2, 2, 0],
+		[0, 1, 1, 1, 1, 1, 0, 2, 3, 2],
+		[0, 1, 1, 1, 1, 1, 1, 2, 2, 2],
+		[2, 1, 1, 1, 1, 1, 1, 2, 2, 0],
+		[0, 2, 2, 2, 2, 2, 2, 0, 0, 0],
+		[0, 2, 2, 0, 0, 2, 2, 0, 0, 0]
 	]
-	},
-
-	TEMPLATE_TURTLE: {
-		"id": TEMPLATE_TURTLE,
-		"name": "Small Turtle",
-		"description": "A small turtle with a simple shell.",
-		"grid_width": 8,
-		"grid_height": 18,
-		"cell_size": 32,
-		"bucket_width": 2,
-		"bucket_height": 1,
-		"spices_per_sprinkle": 1,
-		"max_falling_spices": 3,
-		"fall_interval": 0.45,
-		"spawn_interval": 0.8,
-		"allowed_spices": [
-			SPICE_HERBS,
-			SPICE_CINNAMON,
-			SPICE_PEPPER
-		],
-		"sections": {
-			1: "Shell",
-			2: "Body",
-			3: "Eye"
-		},
-		"section_spices": {
-			1: SPICE_HERBS,
-			2: SPICE_CINNAMON,
-			3: SPICE_PEPPER
-		},
-		"preview_colors": {
-			1: Color.GREEN,
-			2: Color(0.45, 0.25, 0.1),
-			3: Color.BLACK
-		},
-		"shape": [
-			[0, 0, 1, 1, 1, 1, 0, 0],
-			[0, 1, 1, 1, 1, 1, 1, 0],
-			[1, 1, 1, 1, 1, 1, 2, 2],
-			[1, 1, 1, 1, 1, 1, 2, 3],
-			[0, 2, 1, 1, 1, 1, 2, 0],
-			[0, 2, 2, 0, 0, 2, 2, 0],
-			[0, 0, 2, 0, 0, 2, 0, 0]
-		]
-	},
+},
 
 	TEMPLATE_WHALE: {
 		"id": TEMPLATE_WHALE,
@@ -272,8 +282,8 @@ TEMPLATE_CANDLE: {
 		"cell_size": 30,
 		"bucket_width": 2,
 		"bucket_height": 1,
-		"spices_per_sprinkle": 1,
-		"max_falling_spices": 3,
+		"spices_per_sprinkle": 3,
+		"max_falling_spices": 8,
 		"fall_interval": 0.45,
 		"spawn_interval": 0.75,
 		"allowed_spices": [
