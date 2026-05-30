@@ -15,6 +15,11 @@ run/main_scene="uid://ds8bsq67hqxgi"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[display]
+
+window/size/viewport_width=1000
+window/size/viewport_height=1000
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/godot_vim/plugin.cfg")
